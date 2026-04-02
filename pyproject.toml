@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vrc-live-caption"
+version = "0.1.0"
+description = "Real-time speech caption tool for VRChat via OSC."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "openai>=2.30.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "python-osc>=1.9.3",
+    "pyside6>=6.11.0",
+    "rich>=14.3.3",
+    "sounddevice>=0.5.5",
+    "typer>=0.24.1",
+    "websockets>=16.0",
+]
+
+[project.scripts]
+vrc-live-caption = "vrc_live_caption.cli:main"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.13.5",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "ruff>=0.15.8",
+    "ty>=0.0.26",
+]
+
+[tool.ruff]
+line-length = 88
+force-exclude = true
+exclude = ["docs"]
+
+[tool.ruff.lint]
+extend-select = ["I", "D"]
+ignore = ["D100", "D104", "D105", "D107", "D417"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]
+
+[tool.ty.src]
+exclude = ["docs"]
+
+[tool.pytest.ini_options]
+addopts = '-m "not integration and not openai_live and not iflytek_live"'
+testpaths = ["tests"]
+markers = [
+    "integration: external service or end-to-end tests that are excluded from default pytest runs",
+    "openai_live: tests that call the real OpenAI API and require OPENAI_API_KEY plus network access",
+    "iflytek_live: tests that call the real iFLYTEK RTASR API and require IFLYTEK_* credentials plus network access",
+]
+
+[tool.coverage.run]
+source = ["vrc_live_caption"]
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# fail_under = 80

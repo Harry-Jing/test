@@ -1,0 +1,52 @@
+[capture]
+device = "default"
+sample_rate = 16000
+channels = 1
+dtype = "int16"
+block_duration_ms = 100
+
+[pipeline]
+audio_buffer_max_chunks = 50
+event_buffer_max_items = 200
+shutdown_timeout_seconds = 5.0
+heartbeat_seconds = 5
+
+[logging]
+console_level = "WARNING"
+file_level = "INFO"
+file_path = ".runtime/logs/vrc-live-caption.log"
+max_bytes = 1048576
+backup_count = 3
+
+[debug]
+runtime_dir = ".runtime"
+recordings_dir = ".runtime/recordings"
+probe_seconds = 0.25
+
+[osc]
+host = "127.0.0.1"
+port = 9000
+notification_sfx = false
+
+[stt]
+provider = "openai_realtime"
+
+[stt.retry]
+connect_timeout_seconds = 10.0
+max_attempts = 3
+initial_backoff_seconds = 1.0
+max_backoff_seconds = 5.0
+
+[stt.providers.iflytek_rtasr]
+language = "autodialect"
+vad_mode = "near_field"
+
+[stt.providers.openai_realtime]
+model = "gpt-4o-transcribe"
+language = "zh"
+prompt = "Expect conversational Mandarin Chinese with occasional English technical terms."
+noise_reduction = "near_field"
+turn_detection = "server_vad"
+vad_prefix_padding_ms = 300
+vad_silence_duration_ms = 500
+vad_threshold = 0.5
