@@ -1,0 +1,86 @@
+# STT
+
+This document records the current STT contract after the asyncio pipeline refactor.
+
+## Scope
+
+- This document covers backend selection, session runner lifecycle, retry behavior, connection-attempt boundaries, and normalized events.
+- Capture ownership and CLI composition live in `architecture/runtime.md`.
+
+## Top-Level Model
+
+- The CLI selects one configured `SttBackend`.
+- `AsyncSttSessionRunner` owns the long-lived session lifecycle for one `run`.
+- The runner creates a fresh provider-specific connection attempt for each connect or reconnect.
+- Provider mutable state that only belongs to one connection attempt must never be stored on the long-lived runner or backend object.
+
+## Core Types
+
+- `SttBackend` describes one configured provider and exposes:
+  - backend description
+  - status messages
+  - retriable-error classification
+  - attempt creation
+  - exhausted-error construction
+- `AttemptContext` provides the shared resources for one connection attempt:
+  - the single shared audio queue
+  - event publishing callback
+  - ready callback
+  - stop event
+  - connect timeout
+- `ConnectionAttempt` runs one end-to-end transport attempt until stop, disconnect, or failure.
+
+## Event Contract
+
+- Providers normalize transport-specific messages into provider-neutral events.
+- The current normalized event surface is:
+  - `TranscriptRevisionEvent`
+  - `SttStatusEvent`
+- Transcript revisions remain utterance-based and revision-based.
+- Provider raw websocket or protocol events must not leak into pipeline code.
+
+## Retry Contract
+
+- The runner emits one `connecting` status before the first attempt.
+- Retriable failures emit `retrying` with attempt count and backoff.
+- Non-retriable failures surface as `error` and terminate the runner.
+- Retry timing is controlled by `[stt.retry]`:
+  - `connect_timeout_seconds`
+  - `max_attempts`
+  - `initial_backoff_seconds`
+  - `max_backoff_seconds`
+
+## Provider Boundaries
+
+### OpenAI Realtime
+
+- `OpenAIRealtimeBackend` validates capture shape for mono `int16` audio.
+- Each attempt creates a fresh `OpenAIConnectionState`.
+- Attempt-scoped state includes:
+  - utterance map
+  - PCM16 resampler
+
+### iFLYTEK RTASR
+
+- `IflytekRtasrBackend` validates capture shape for `16000 Hz`, mono, `int16` audio.
+- Each attempt creates a fresh `IflytekConnectionState`.
+- Attempt-scoped state includes:
+  - utterance map
+  - audio chunker
+  - session id
+  - paced-send timing fields
+  - end-of-stream flags
+
+## Queue Ownership Rule
+
+- STT no longer owns a second audio input queue.
+- Connection attempts read directly from the single pipeline-owned audio queue.
+- STT still owns its own bounded event queue for normalized events emitted back to the pipeline controller.
+
+## Shutdown Rule
+
+- Closing the runner sets the shared stop event and emits `closing`.
+- The pipeline closes the shared audio queue after capture stops.
+- Provider attempts must treat queue closure or stop-requested as the trigger for final flush / end-of-stream behavior.
+- The runner emits `closed` after the attempt loop exits.
+- External task cancellation during CLI interrupt shutdown is not emitted as STT `error`.
