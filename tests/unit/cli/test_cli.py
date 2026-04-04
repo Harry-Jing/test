@@ -5,12 +5,15 @@ import runpy
 import sys
 from pathlib import Path
 
+import pytest
+
 from tests.support.audio_fakes import FakeBackend
 from vrc_live_caption import __version__
+from vrc_live_caption import cli as cli_module
 from vrc_live_caption.audio import AudioDeviceInfo
 from vrc_live_caption.cli import app
-from vrc_live_caption.config import LogLevel
-from vrc_live_caption.errors import OscError, SecretError
+from vrc_live_caption.config import ConfigError, LoggingConfig, LogLevel
+from vrc_live_caption.errors import AudioRuntimeError, OscError, SecretError
 from vrc_live_caption.stt.funasr_local import FunasrLocalReadyEvent
 
 
@@ -59,6 +62,24 @@ def test_devices_reports_backend_errors(monkeypatch, cli_runner) -> None:
 
     assert result.exit_code == 1
     assert "backend down" in result.output
+
+
+def test_devices_exits_non_zero_when_no_input_devices_exist(
+    monkeypatch, cli_runner
+) -> None:
+    class EmptyBackend:
+        def list_input_devices(self):
+            return []
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_audio_backend",
+        lambda: EmptyBackend(),
+    )
+
+    result = cli_runner.invoke(app, ["devices"])
+
+    assert result.exit_code == 1
+    assert "No input audio devices found." in result.output
 
 
 def test_root_help_shows_description_and_version_option(cli_runner) -> None:
@@ -283,6 +304,77 @@ def test_doctor_cli_log_level_flags_override_config(
     assert captured["config"].file_level == LogLevel.DEBUG
 
 
+def test_apply_logging_overrides_returns_existing_config_when_no_updates() -> None:
+    config = LoggingConfig()
+
+    assert (
+        cli_module._apply_logging_overrides(
+            config,
+            console_log_level=None,
+            file_log_level=None,
+        )
+        is config
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("true", True),
+        ("YES", True),
+        ("0", False),
+        ("off", False),
+    ],
+)
+def test_parse_cli_bool_accepts_expected_values(raw: str, expected: bool) -> None:
+    assert cli_module._parse_cli_bool(raw, context="--typing") is expected
+
+
+def test_parse_cli_bool_rejects_invalid_values() -> None:
+    with pytest.raises(ValueError, match="--typing must be true or false"):
+        cli_module._parse_cli_bool("maybe", context="--typing")
+
+
+def test_consume_current_task_cancellation_handles_missing_task(monkeypatch) -> None:
+    monkeypatch.setattr("vrc_live_caption.cli.asyncio.current_task", lambda: None)
+
+    assert cli_module._consume_current_task_cancellation() is False
+
+
+def test_consume_current_task_cancellation_handles_task_without_uncancel(
+    monkeypatch,
+) -> None:
+    class FakeTask:
+        def cancelling(self) -> int:
+            return 1
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.asyncio.current_task",
+        lambda: FakeTask(),
+    )
+
+    assert cli_module._consume_current_task_cancellation() is False
+
+
+def test_consume_current_task_cancellation_uncancels_pending_state(monkeypatch) -> None:
+    class FakeTask:
+        def __init__(self) -> None:
+            self.remaining = 2
+
+        def cancelling(self) -> int:
+            return self.remaining
+
+        def uncancel(self) -> int:
+            self.remaining -= 1
+            return self.remaining
+
+    task = FakeTask()
+    monkeypatch.setattr("vrc_live_caption.cli.asyncio.current_task", lambda: task)
+
+    assert cli_module._consume_current_task_cancellation() is True
+    assert task.remaining == 0
+
+
 def test_run_help_shows_grouped_panels_and_log_level_choices(cli_runner) -> None:
     result = cli_runner.invoke(app, ["run", "--help"])
 
@@ -403,6 +495,56 @@ def test_run_reports_missing_iflytek_secret(
     assert "IFLYTEK_APP_ID not found" in result.output
 
 
+def test_run_reports_vrc_runtime_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    async def fake_run_live_command(**kwargs) -> None:
+        raise AudioRuntimeError("capture failed")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr("vrc_live_caption.cli._run_live_command", fake_run_live_command)
+
+    result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "capture failed" in result.output
+
+
+def test_run_reports_unexpected_runtime_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    async def fake_run_live_command(**kwargs) -> None:
+        raise RuntimeError("unexpected failure")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr("vrc_live_caption.cli._run_live_command", fake_run_live_command)
+
+    result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "unexpected failure" in result.output
+
+
+def test_run_returns_cleanly_on_keyboard_interrupt(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    async def fake_run_live_command(**kwargs) -> None:
+        raise KeyboardInterrupt
+
+    config_path = config_file_factory()
+    monkeypatch.setattr("vrc_live_caption.cli._run_live_command", fake_run_live_command)
+
+    result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+
+
 def test_doctor_accepts_openai_backend_when_openai_key_is_present(
     monkeypatch,
     config_file_factory,
@@ -490,6 +632,64 @@ def test_local_stt_serve_uses_local_sidecar_entrypoint(
     assert "Starting local FunASR sidecar on ws://127.0.0.1:10095" in result.output
 
 
+def test_local_stt_serve_reports_config_errors(monkeypatch, cli_runner) -> None:
+    monkeypatch.setattr(
+        "vrc_live_caption.cli._load_optional_local_stt_config",
+        lambda config: (_ for _ in ()).throw(ConfigError("bad local stt config")),
+    )
+
+    result = cli_runner.invoke(app, ["local-stt", "serve"])
+
+    assert result.exit_code == 1
+    assert "bad local stt config" in result.output
+
+
+def test_local_stt_serve_reports_vrc_runtime_errors(monkeypatch, cli_runner) -> None:
+    async def fake_run_funasr_local_server(**kwargs) -> None:
+        raise AudioRuntimeError("sidecar failed")
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.run_funasr_local_server",
+        fake_run_funasr_local_server,
+    )
+
+    result = cli_runner.invoke(app, ["local-stt", "serve"])
+
+    assert result.exit_code == 1
+    assert "sidecar failed" in result.output
+
+
+def test_local_stt_serve_reports_unexpected_runtime_errors(
+    monkeypatch, cli_runner
+) -> None:
+    async def fake_run_funasr_local_server(**kwargs) -> None:
+        raise RuntimeError("unexpected serve failure")
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.run_funasr_local_server",
+        fake_run_funasr_local_server,
+    )
+
+    result = cli_runner.invoke(app, ["local-stt", "serve"])
+
+    assert result.exit_code == 1
+    assert "unexpected serve failure" in result.output
+
+
+def test_local_stt_serve_returns_on_keyboard_interrupt(monkeypatch, cli_runner) -> None:
+    async def fake_run_funasr_local_server(**kwargs) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.run_funasr_local_server",
+        fake_run_funasr_local_server,
+    )
+
+    result = cli_runner.invoke(app, ["local-stt", "serve"])
+
+    assert result.exit_code == 0
+
+
 def test_run_reports_missing_openai_secret_for_openai_backend(
     monkeypatch,
     config_file_factory,
@@ -555,6 +755,46 @@ def test_record_sample_reports_capture_failures(
     assert "Failed to start audio capture" in result.output
 
 
+def test_record_sample_reports_vrc_runtime_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    async def fake_record_sample_command(**kwargs) -> None:
+        raise AudioRuntimeError("recording failed")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr(
+        "vrc_live_caption.cli._run_record_sample_command",
+        fake_record_sample_command,
+    )
+
+    result = cli_runner.invoke(app, ["record-sample", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "recording failed" in result.output
+
+
+def test_record_sample_reports_unexpected_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    async def fake_record_sample_command(**kwargs) -> None:
+        raise RuntimeError("unexpected recording failure")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr(
+        "vrc_live_caption.cli._run_record_sample_command",
+        fake_record_sample_command,
+    )
+
+    result = cli_runner.invoke(app, ["record-sample", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "unexpected recording failure" in result.output
+
+
 def test_osc_test_sends_text_and_optional_typing(
     monkeypatch,
     config_file_factory,
@@ -584,6 +824,70 @@ def test_osc_test_sends_text_and_optional_typing(
     assert osc_transport.text_messages == ["hello world"]
     assert "Sent chatbox text to 127.0.0.1:9000" in result.output
     assert "[chatbox] hello world" in result.output
+
+
+def test_osc_test_rejects_invalid_typing_values(
+    config_file_factory,
+    cli_runner,
+) -> None:
+    config_path = config_file_factory()
+
+    result = cli_runner.invoke(
+        app,
+        [
+            "osc-test",
+            "hello world",
+            "--config",
+            str(config_path),
+            "--typing",
+            "maybe",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--typing must be true or false" in result.output
+
+
+def test_osc_test_reports_vrc_runtime_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    class BrokenOscTransport(_FakeOscTransport):
+        def send_text(self, text: str) -> None:
+            raise OscError("osc send failed")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_osc_chatbox_transport",
+        lambda *, app_config, logger: BrokenOscTransport(),
+    )
+
+    result = cli_runner.invoke(app, ["osc-test", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "osc send failed" in result.output
+
+
+def test_osc_test_reports_unexpected_errors(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    class BrokenOscTransport(_FakeOscTransport):
+        def send_text(self, text: str) -> None:
+            raise RuntimeError("unexpected osc failure")
+
+    config_path = config_file_factory()
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_osc_chatbox_transport",
+        lambda *, app_config, logger: BrokenOscTransport(),
+    )
+
+    result = cli_runner.invoke(app, ["osc-test", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "unexpected osc failure" in result.output
 
 
 def test_doctor_reports_osc_configuration_errors(
