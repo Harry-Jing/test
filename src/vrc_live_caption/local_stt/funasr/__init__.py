@@ -8,4 +8,3 @@ __all__ = [
     "FunasrLocalServiceConfig",
     "run_funasr_local_server",
 ]
-

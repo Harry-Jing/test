@@ -43,4 +43,3 @@ uv run vrc-live-caption run
 ```
 
 OpenAI is the default backend. To use iFLYTEK instead, switch `[stt].provider` in `vrc-live-caption.toml` and set the required `IFLYTEK_*` secrets in `.env`.
-

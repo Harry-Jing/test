@@ -333,7 +333,9 @@ def test_websocket_session_emit_online_partial_skips_empty_and_duplicate_text() 
     asyncio.run(scenario())
 
 
-def test_websocket_session_emit_offline_final_force_without_packets_resets_state() -> None:
+def test_websocket_session_emit_offline_final_force_without_packets_resets_state() -> (
+    None
+):
     async def scenario() -> None:
         websocket = _FakeWebsocket([])
         session = FunasrWebsocketSession(

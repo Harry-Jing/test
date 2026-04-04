@@ -405,7 +405,10 @@ def test_live_pipeline_controller_emits_status_variants_and_logs_levels(
         controller._emit_event(SttStatusEvent(status=SttStatus.ERROR, message="boom"))
         controller._log_heartbeat()
 
-    assert cast(_FakeTranscriptOutput, controller.transcript_output).events[0].text == "hello"
+    assert (
+        cast(_FakeTranscriptOutput, controller.transcript_output).events[0].text
+        == "hello"
+    )
     assert emitted_lines == [
         "[status] ready: ready",
         "[status] retrying attempt=2",
@@ -488,7 +491,9 @@ def test_live_pipeline_controller_stop_preserves_vrc_errors() -> None:
             capture=_FakeCapture(audio_queue),
             session_runner=cast(
                 AsyncSttSessionRunner,
-                _StubSessionRunner(close_error=AudioRuntimeError("runner close failed")),
+                _StubSessionRunner(
+                    close_error=AudioRuntimeError("runner close failed")
+                ),
             ),
             transcript_output=_FakeTranscriptOutput(),
             emit_line=lambda _line: None,

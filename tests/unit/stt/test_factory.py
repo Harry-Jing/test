@@ -69,7 +69,9 @@ def test_create_stt_backend_builds_iflytek_backend_with_credentials(
         captured.update(kwargs)
         return "iflytek-backend"
 
-    monkeypatch.setattr("vrc_live_caption.stt.factory.IflytekRtasrBackend", fake_backend)
+    monkeypatch.setattr(
+        "vrc_live_caption.stt.factory.IflytekRtasrBackend", fake_backend
+    )
 
     result = create_stt_backend(
         capture_config=CaptureConfig(),

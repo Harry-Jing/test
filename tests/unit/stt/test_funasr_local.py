@@ -530,11 +530,16 @@ def test_funasr_local_attempt_flushes_after_stop(monkeypatch) -> None:
 
         await attempt.run()
 
-        assert decode_json_message(cast(str, connection.sent[0])) == build_client_start_message(
+        assert decode_json_message(
+            cast(str, connection.sent[0])
+        ) == build_client_start_message(
             sample_rate=16_000,
             channels=1,
         )
-        assert decode_json_message(cast(str, connection.sent[1])) == build_client_stop_message()
+        assert (
+            decode_json_message(cast(str, connection.sent[1]))
+            == build_client_stop_message()
+        )
         assert ready_messages == [
             "FunASR local sidecar ready (127.0.0.1:10095, device=cuda:0, policy=auto)"
         ]
