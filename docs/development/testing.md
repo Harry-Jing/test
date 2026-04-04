@@ -7,7 +7,7 @@ How to verify `VRC Live Caption` locally.
 Run these commands from the repository root:
 
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 uv run pytest -q
 uv run ruff check
 uv run ruff format --check
