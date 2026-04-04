@@ -57,6 +57,15 @@ uv run pytest -q tests/integration -m "integration and openai_live"
 - Requires `OPENAI_API_KEY` and outbound network access.
 - Replays `tests/fixtures/audio/test.wav` through the async STT runner and asserts keyword-based transcript success.
 
+### Local STT Sidecar
+
+```bash
+uv run pytest -q tests/integration/test_local_stt_sidecar.py -m integration
+```
+
+- Starts a local websocket sidecar in-process with fake inference models and replays `tests/fixtures/audio/test.wav` through the `funasr_local` runner path.
+- This verifies the repository-local websocket protocol, transcript normalization, and shutdown behavior without loading real FunASR models.
+
 ## Manual Runtime Validation
 
 Use a native Windows terminal for microphone and audio-device validation:
@@ -64,14 +73,16 @@ Use a native Windows terminal for microphone and audio-device validation:
 ```bash
 uv run vrc-live-caption devices
 uv run vrc-live-caption doctor
+uv run vrc-live-caption local-stt serve
 uv run vrc-live-caption osc-test "OSC test"
 uv run vrc-live-caption record-sample --seconds 10
 uv run vrc-live-caption run
 ```
 
 - Before `osc-test` or `run`, ensure VRChat has OSC enabled and is listening on the configured host and port.
-- Before `doctor` or `run`, ensure the credentials required by the selected `stt.provider` are available.
+- Before `doctor` or `run`, ensure the credentials required by the selected `stt.provider` are available, or start `vrc-live-caption local-stt serve` when using `funasr_local`.
 - `osc-test` does not require STT credentials.
+- `local-stt serve` uses `local-stt-funasr.toml` when present and otherwise falls back to built-in defaults.
 
 ## Config Notes
 

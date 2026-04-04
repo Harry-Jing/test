@@ -6,6 +6,7 @@ from vrc_live_caption.config import (
     AppConfig,
     CaptureConfig,
     DebugConfig,
+    FunasrLocalProviderConfig,
     IflytekRtasrProviderConfig,
     LoggingConfig,
     LogLevel,
@@ -56,6 +57,7 @@ def build_config(tmp_path: Path, **capture_overrides: object) -> AppConfig:
             provider="iflytek_rtasr",
             retry=SttRetryConfig(),
             providers=SttProvidersConfig(
+                funasr_local=FunasrLocalProviderConfig(),
                 iflytek_rtasr=IflytekRtasrProviderConfig(),
                 openai_realtime=OpenAIRealtimeProviderConfig(),
             ),
@@ -74,6 +76,7 @@ def write_test_config(
     osc_overrides: Mapping[str, object] | None = None,
     stt_overrides: Mapping[str, object] | None = None,
     stt_retry_overrides: Mapping[str, object] | None = None,
+    funasr_local_overrides: Mapping[str, object] | None = None,
     iflytek_rtasr_overrides: Mapping[str, object] | None = None,
     openai_realtime_overrides: Mapping[str, object] | None = None,
 ) -> Path:
@@ -117,6 +120,11 @@ def write_test_config(
         "language": "autodialect",
         "vad_mode": "near_field",
     }
+    funasr_local_values: dict[str, object] = {
+        "host": "127.0.0.1",
+        "port": 10095,
+        "use_ssl": False,
+    }
     openai_realtime_values: dict[str, object] = {
         "model": "gpt-4o-transcribe",
         "noise_reduction": "near_field",
@@ -148,6 +156,7 @@ def write_test_config(
         )
     if "max_backoff_seconds" in stt_values:
         stt_retry_values["max_backoff_seconds"] = stt_values.pop("max_backoff_seconds")
+    funasr_local_values.update(funasr_local_overrides or {})
     iflytek_rtasr_values.update(iflytek_rtasr_overrides or {})
     openai_realtime_values.update(openai_realtime_overrides or {})
 
@@ -159,6 +168,7 @@ def write_test_config(
         ("osc", osc_values),
         ("stt", stt_values),
         ("stt.retry", stt_retry_values),
+        ("stt.providers.funasr_local", funasr_local_values),
         ("stt.providers.iflytek_rtasr", iflytek_rtasr_values),
         ("stt.providers.openai_realtime", openai_realtime_values),
     ]

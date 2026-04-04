@@ -64,9 +64,7 @@ def test_root_help_shows_description_and_version_option(cli_runner) -> None:
     result = cli_runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "VRC Live Caption CLI for audio diagnostics and live cloud speech" in (
-        result.output
-    )
+    assert "local STT sidecars" in result.output
     assert "--version" in result.output
 
 
@@ -426,6 +424,63 @@ def test_doctor_accepts_openai_backend_when_openai_key_is_present(
 
     assert result.exit_code == 0
     assert "[ok] stt backend configured: openai_realtime" in result.output
+
+
+def test_doctor_checks_local_funasr_sidecar_without_secret_validation(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    backend = FakeBackend()
+    osc_transport = _FakeOscTransport()
+    config_path = config_file_factory(stt_overrides={"provider": "funasr_local"})
+    monkeypatch.setattr("vrc_live_caption.cli.create_audio_backend", lambda: backend)
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_osc_chatbox_transport",
+        lambda *, app_config, logger: osc_transport,
+    )
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.probe_funasr_local_service",
+        lambda **kwargs: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.validate_stt_secrets",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+
+    result = cli_runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert "[ok] stt backend configured: funasr_local" in result.output
+    assert "[ok] local STT sidecar reachable" in result.output
+
+
+def test_local_stt_serve_uses_local_sidecar_entrypoint(
+    monkeypatch,
+    tmp_cwd: Path,
+    cli_runner,
+) -> None:
+    captured = {}
+
+    async def fake_run_funasr_local_server(*, config, host, port, logger) -> None:
+        captured["config"] = config
+        captured["host"] = host
+        captured["port"] = port
+
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.run_funasr_local_server",
+        fake_run_funasr_local_server,
+    )
+
+    result = cli_runner.invoke(
+        app,
+        ["local-stt", "serve", "--host", "127.0.0.1", "--port", "10095"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 10095
+    assert "Starting local FunASR sidecar on ws://127.0.0.1:10095" in result.output
 
 
 def test_run_reports_missing_openai_secret_for_openai_backend(

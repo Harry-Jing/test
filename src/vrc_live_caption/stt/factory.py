@@ -5,6 +5,7 @@ import logging
 from ..config import CaptureConfig, SttConfig
 from ..env import AppSecrets
 from ..errors import SttSessionError
+from .funasr_local import FunasrLocalBackend
 from .iflytek_rtasr import IflytekRtasrBackend
 from .openai_realtime import OpenAIRealtimeBackend
 from .types import SttBackend
@@ -18,6 +19,14 @@ def create_stt_backend(
     logger: logging.Logger,
 ) -> SttBackend:
     """Create the configured STT backend with validated credentials."""
+    if stt_config.provider == "funasr_local":
+        return FunasrLocalBackend(
+            capture_config=capture_config,
+            retry_config=stt_config.retry,
+            provider_config=stt_config.providers.funasr_local,
+            logger=logger.getChild("funasr_local"),
+        )
+
     if stt_config.provider == "iflytek_rtasr":
         credentials = secrets.require_iflytek_credentials()
         return IflytekRtasrBackend(
@@ -45,6 +54,10 @@ def create_stt_backend(
 
 def describe_stt_backend(stt_config: SttConfig) -> str:
     """Describe the configured STT backend in CLI-friendly terms."""
+    if stt_config.provider == "funasr_local":
+        provider_config = stt_config.providers.funasr_local
+        return f"{stt_config.provider} ({provider_config.host}:{provider_config.port})"
+
     if stt_config.provider == "iflytek_rtasr":
         provider_config = stt_config.providers.iflytek_rtasr
         return (
@@ -60,6 +73,8 @@ def describe_stt_backend(stt_config: SttConfig) -> str:
 
 def validate_stt_secrets(*, stt_config: SttConfig, secrets: AppSecrets) -> None:
     """Validate that the active STT provider has the required credentials."""
+    if stt_config.provider == "funasr_local":
+        return
     if stt_config.provider == "iflytek_rtasr":
         secrets.require_iflytek_credentials()
         return

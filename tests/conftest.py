@@ -32,6 +32,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
         osc_overrides: dict[str, Any] | None = None,
         stt_overrides: dict[str, Any] | None = None,
         stt_retry_overrides: dict[str, Any] | None = None,
+        funasr_local_overrides: dict[str, Any] | None = None,
         iflytek_rtasr_overrides: dict[str, Any] | None = None,
         openai_realtime_overrides: dict[str, Any] | None = None,
     ) -> Path:
@@ -46,6 +47,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
             osc_overrides=osc_overrides,
             stt_overrides=stt_overrides,
             stt_retry_overrides=stt_retry_overrides,
+            funasr_local_overrides=funasr_local_overrides,
             iflytek_rtasr_overrides=iflytek_rtasr_overrides,
             openai_realtime_overrides=openai_realtime_overrides,
         )

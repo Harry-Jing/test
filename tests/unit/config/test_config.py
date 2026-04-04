@@ -5,6 +5,7 @@ import pytest
 from vrc_live_caption.config import (
     AppConfig,
     ConfigError,
+    FunasrLocalProviderConfig,
     IflytekRtasrProviderConfig,
     LogLevel,
     OscConfig,
@@ -26,6 +27,8 @@ def test_load_app_config_returns_defaults_when_optional_file_is_missing(
     assert config.osc.port == 9000
     assert config.osc.notification_sfx is False
     assert config.stt.provider == "openai_realtime"
+    assert config.stt.providers.funasr_local.host == "127.0.0.1"
+    assert config.stt.providers.funasr_local.port == 10095
     assert config.stt.providers.iflytek_rtasr.language == "autodialect"
     assert config.stt.providers.iflytek_rtasr.vad_mode == "near_field"
     assert config.stt.providers.openai_realtime.model == "gpt-4o-transcribe"
@@ -89,6 +92,11 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
                 "initial_backoff_seconds = 1.5",
                 "max_backoff_seconds = 6.0",
                 "",
+                "[stt.providers.funasr_local]",
+                'host = "127.0.0.1"',
+                "port = 10096",
+                "use_ssl = false",
+                "",
                 "[stt.providers.iflytek_rtasr]",
                 'language = "autominor"',
                 'vad_mode = "far_field"',
@@ -122,6 +130,7 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
     assert config.osc.notification_sfx is True
     assert config.stt.retry.connect_timeout_seconds == 12.5
     assert config.stt.retry.max_attempts == 4
+    assert config.stt.providers.funasr_local.port == 10096
     assert config.stt.providers.iflytek_rtasr.language == "autominor"
     assert config.stt.providers.iflytek_rtasr.vad_mode == "far_field"
     assert config.stt.providers.iflytek_rtasr.domain == "tech"
@@ -211,6 +220,7 @@ def test_stt_config_default_models_do_not_share_nested_instances() -> None:
 
     assert first.retry is not second.retry
     assert first.providers is not second.providers
+    assert first.providers.funasr_local is not second.providers.funasr_local
     assert first.providers.iflytek_rtasr is not second.providers.iflytek_rtasr
     assert first.providers.openai_realtime is not second.providers.openai_realtime
 
@@ -219,6 +229,17 @@ def test_stt_config_accepts_openai_provider_selection() -> None:
     config = SttConfig(provider="openai_realtime")
 
     assert config.provider == "openai_realtime"
+
+
+def test_stt_config_accepts_funasr_local_provider_selection() -> None:
+    config = SttConfig(provider="funasr_local")
+
+    assert config.provider == "funasr_local"
+
+
+def test_funasr_local_provider_config_rejects_out_of_range_port() -> None:
+    with pytest.raises(ValueError, match="funasr_local.port must be <= 65535"):
+        FunasrLocalProviderConfig(port=70_000)
 
 
 def test_iflytek_rtasr_config_rejects_invalid_vad_mode() -> None:

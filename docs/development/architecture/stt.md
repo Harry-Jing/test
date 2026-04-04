@@ -71,6 +71,22 @@ This document records the current STT contract after the asyncio pipeline refact
   - paced-send timing fields
   - end-of-stream flags
 
+### FunASR Local Sidecar
+
+- `FunasrLocalBackend` validates capture shape for `16000 Hz`, mono, `int16` audio.
+- The backend connects to a repository-local websocket sidecar started by `vrc-live-caption local-stt serve`.
+- Main-app config only stores sidecar connection settings under `[stt.providers.funasr_local]`.
+- Model selection, chunking, VAD, punctuation, and CPU thread settings live in `local-stt-funasr.toml`.
+- Each attempt creates a fresh `FunasrLocalConnectionState`.
+- Attempt-scoped state includes:
+  - segment-to-revision tracking for normalized utterances
+- The sidecar protocol is internal to the repository:
+  - client sends `start`, raw PCM16 audio frames, then `stop`
+  - server emits `ready`, `transcript`, and `error`
+- Sidecar `online` and `offline` transcript phases are normalized into the shared `TranscriptRevisionEvent` surface:
+  - online phase emits `is_final = false`
+  - offline phase emits the final revision with `is_final = true`
+
 ## Queue Ownership Rule
 
 - STT no longer owns a second audio input queue.

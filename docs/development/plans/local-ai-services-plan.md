@@ -95,3 +95,14 @@
 - 更容易替换底层实现的方案
 - 对主运行时侵入更小的方案
 - 更符合 Windows 主平台维护成本的方案
+
+---
+
+## 7. 当前落地说明（M5 第一版）
+
+- 本地 STT 已按同包 sidecar 方向落地，而不是新建独立 `services` 项目。
+- 主程序新增 `funasr_local` provider，通过本地 websocket 连接 `vrc-live-caption local-stt serve`。
+- 主程序配置只保留 sidecar 连接信息。
+- FunASR 模型、chunk、VAD、标点和线程等重参数收敛到 `local-stt-funasr.toml`。
+- 第一版默认以 Windows + CPU + `16000 Hz`/mono/`int16` 为唯一主路径。
+- 第一版不包含自动拉起、打包分发、模型自动下载或 GPU 优化。

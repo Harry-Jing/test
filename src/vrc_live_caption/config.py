@@ -18,7 +18,7 @@ from pydantic import (
 from .errors import ConfigError
 
 DEFAULT_CONFIG_PATH = Path("vrc-live-caption.toml")
-_SUPPORTED_STT_PROVIDERS = {"iflytek_rtasr", "openai_realtime"}
+_SUPPORTED_STT_PROVIDERS = {"funasr_local", "iflytek_rtasr", "openai_realtime"}
 
 
 def _coerce_int(value: Any, context: str, *, minimum: int | None = None) -> int:
@@ -408,9 +408,41 @@ class IflytekRtasrProviderConfig(_ConfigModel):
         return _coerce_optional_str(value, "stt.providers.iflytek_rtasr.domain")
 
 
+class FunasrLocalProviderConfig(_ConfigModel):
+    """Store local FunASR sidecar connection settings."""
+
+    host: str = "127.0.0.1"
+    port: int = 10095
+    use_ssl: bool = False
+
+    @field_validator("host", mode="before")
+    @classmethod
+    def _validate_host(cls, value: Any) -> str:
+        return _coerce_str(value, "stt.providers.funasr_local.host")
+
+    @field_validator("port", mode="before")
+    @classmethod
+    def _validate_port(cls, value: Any) -> int:
+        return _coerce_int(value, "stt.providers.funasr_local.port", minimum=1)
+
+    @field_validator("use_ssl", mode="before")
+    @classmethod
+    def _validate_use_ssl(cls, value: Any) -> bool:
+        return _coerce_bool(value, "stt.providers.funasr_local.use_ssl")
+
+    @model_validator(mode="after")
+    def _validate_ranges(self) -> Self:
+        if self.port > 65_535:
+            raise ValueError("stt.providers.funasr_local.port must be <= 65535")
+        return self
+
+
 class SttProvidersConfig(_ConfigModel):
     """Store provider-specific STT configuration blocks."""
 
+    funasr_local: FunasrLocalProviderConfig = Field(
+        default_factory=FunasrLocalProviderConfig
+    )
     iflytek_rtasr: IflytekRtasrProviderConfig = Field(
         default_factory=IflytekRtasrProviderConfig
     )
@@ -534,6 +566,7 @@ __all__ = [
     "CaptureConfig",
     "ConfigError",
     "DebugConfig",
+    "FunasrLocalProviderConfig",
     "IflytekRtasrProviderConfig",
     "LogLevel",
     "LoggingConfig",

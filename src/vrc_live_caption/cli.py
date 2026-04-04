@@ -13,6 +13,7 @@ from .chatbox import ChatboxOutput
 from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
 from .env import AppSecrets, SecretError
 from .errors import OscError, VrcLiveCaptionError
+from .local_stt.funasr import FunasrLocalServiceConfig, run_funasr_local_server
 from .logging_utils import configure_logging
 from .osc import OscChatboxTransport
 from .pipeline import LivePipelineController, record_audio_sample
@@ -21,17 +22,24 @@ from .stt import (
     AsyncSttSessionRunner,
     create_stt_backend,
     describe_stt_backend,
+    probe_funasr_local_service,
     validate_stt_secrets,
 )
 
 _INTERRUPT_EXCEPTIONS = (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
 
 app = typer.Typer(
-    help="VRC Live Caption CLI for audio diagnostics and live cloud speech transcription.",
+    help="VRC Live Caption CLI for audio diagnostics, live transcription, and local STT sidecars.",
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+local_stt_app = typer.Typer(
+    help="Manage repository-local STT sidecars.",
+    add_completion=False,
+    no_args_is_help=True,
+)
+app.add_typer(local_stt_app, name="local-stt")
 
 
 ConfigPathOption = Annotated[
@@ -75,6 +83,32 @@ RecordingOutputOption = Annotated[
         "--output",
         help="Optional WAV output path.",
         rich_help_panel="Recording",
+    ),
+]
+LocalSttConfigPathOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--config",
+        help="Path to the local STT sidecar TOML config file.",
+        rich_help_panel="Configuration",
+    ),
+]
+LocalSttHostOption = Annotated[
+    str,
+    typer.Option(
+        "--host",
+        help="Host interface for the local STT sidecar websocket server.",
+        rich_help_panel="Network",
+    ),
+]
+LocalSttPortOption = Annotated[
+    int,
+    typer.Option(
+        "--port",
+        min=1,
+        max=65_535,
+        help="Port for the local STT sidecar websocket server.",
+        rich_help_panel="Network",
     ),
 ]
 
@@ -193,6 +227,18 @@ def _load_optional_config(config_path: Path | None) -> tuple[AppConfig, Path, bo
     resolved = config_path or AppConfig.default_path()
     exists = resolved.exists()
     return AppConfig.from_toml_file(resolved, required=False), resolved, exists
+
+
+def _load_optional_local_stt_config(
+    config_path: Path | None,
+) -> tuple[FunasrLocalServiceConfig, Path, bool]:
+    resolved = config_path or FunasrLocalServiceConfig.default_path()
+    exists = resolved.exists()
+    return (
+        FunasrLocalServiceConfig.from_toml_file(resolved, required=False),
+        resolved,
+        exists,
+    )
 
 
 def _exit_with_error(message: str, *, code: int = 1) -> None:
@@ -407,15 +453,32 @@ def doctor(
         typer.echo(f"[error] osc target configuration failed: {exc}")
 
     typer.echo(f"[ok] stt backend configured: {describe_stt_backend(app_config.stt)}")
-    try:
-        validate_stt_secrets(stt_config=app_config.stt, secrets=AppSecrets())
-        typer.echo("[ok] required STT secrets found")
-    except SecretError as exc:
-        exit_code = 1
-        typer.echo(f"[error] {exc}")
-        typer.echo(
-            "        Hint: create a .env file in the repo root or export the backend-specific credentials."
-        )
+    if app_config.stt.provider == "funasr_local":
+        try:
+            asyncio.run(
+                probe_funasr_local_service(
+                    capture_config=app_config.capture,
+                    provider_config=app_config.stt.providers.funasr_local,
+                    timeout_seconds=app_config.stt.retry.connect_timeout_seconds,
+                )
+            )
+            typer.echo("[ok] local STT sidecar reachable")
+        except Exception as exc:
+            exit_code = 1
+            typer.echo(f"[error] local STT sidecar check failed: {exc}")
+            typer.echo(
+                "        Hint: start `vrc-live-caption local-stt serve` and confirm host/port match [stt.providers.funasr_local]."
+            )
+    else:
+        try:
+            validate_stt_secrets(stt_config=app_config.stt, secrets=AppSecrets())
+            typer.echo("[ok] required STT secrets found")
+        except SecretError as exc:
+            exit_code = 1
+            typer.echo(f"[error] {exc}")
+            typer.echo(
+                "        Hint: create a .env file in the repo root or export the backend-specific credentials."
+            )
 
     raise typer.Exit(code=exit_code)
 
@@ -487,7 +550,7 @@ def run(
     console_log_level: ConsoleLogLevelOption = None,
     file_log_level: FileLogLevelOption = None,
 ) -> None:
-    """Run the microphone-to-cloud-STT transcription pipeline."""
+    """Run the microphone-to-STT transcription pipeline."""
     try:
         app_config, resolved_config_path = _load_required_config(config)
     except ConfigError as exc:
@@ -573,6 +636,64 @@ def record_sample(
         _exit_with_error(str(exc))
 
     typer.echo(f"Recorded sample: {output_path}")
+
+
+@local_stt_app.command("serve", short_help="Run the local FunASR STT sidecar.")
+def local_stt_serve(
+    config: LocalSttConfigPathOption = None,
+    host: LocalSttHostOption = "127.0.0.1",
+    port: LocalSttPortOption = 10095,
+    console_log_level: ConsoleLogLevelOption = None,
+    file_log_level: FileLogLevelOption = None,
+) -> None:
+    """Run the repository-local FunASR websocket sidecar."""
+    try:
+        local_config, resolved_config_path, config_exists = _load_optional_local_stt_config(
+            config
+        )
+    except ConfigError as exc:
+        _exit_with_error(str(exc))
+
+    logging_config = _apply_logging_overrides(
+        LoggingConfig(file_path=local_config.log_path),
+        console_log_level=console_log_level,
+        file_log_level=file_log_level,
+    )
+    root_logger = configure_logging(logging_config)
+    logger = root_logger.getChild("cli")
+    logger.info(
+        "local-stt serve started: config=%s config_exists=%s host=%s port=%s",
+        resolved_config_path,
+        config_exists,
+        host,
+        port,
+    )
+
+    if config_exists:
+        typer.echo(f"Local STT config: {resolved_config_path}")
+    else:
+        typer.echo(
+            f"[warn] local STT config missing: {resolved_config_path} (serve used built-in defaults)"
+        )
+    typer.echo(f"Starting local FunASR sidecar on ws://{host}:{port}")
+
+    try:
+        asyncio.run(
+            run_funasr_local_server(
+                config=local_config,
+                host=host,
+                port=port,
+                logger=root_logger.getChild("local_stt.funasr"),
+            )
+        )
+    except KeyboardInterrupt:
+        return
+    except VrcLiveCaptionError as exc:
+        logger.error("local-stt serve failed: %s", exc)
+        _exit_with_error(str(exc))
+    except Exception as exc:
+        logger.exception("local-stt serve failed")
+        _exit_with_error(str(exc))
 
 
 def main() -> None:

@@ -2,6 +2,11 @@
 
 from ..errors import SttSessionError
 from .factory import create_stt_backend, describe_stt_backend, validate_stt_secrets
+from .funasr_local import (
+    FatalFunasrLocalServerError,
+    FunasrLocalBackend,
+    probe_funasr_local_service,
+)
 from .iflytek_rtasr import (
     FatalIflytekServerError,
     IflytekRtasrBackend,
@@ -25,10 +30,13 @@ __all__ = [
     "ConnectionAttempt",
     "create_stt_backend",
     "describe_stt_backend",
+    "FatalFunasrLocalServerError",
     "FatalIflytekServerError",
     "FatalRealtimeServerError",
+    "FunasrLocalBackend",
     "IflytekRtasrBackend",
     "OpenAIRealtimeBackend",
+    "probe_funasr_local_service",
     "RetriableIflytekServerError",
     "SttBackend",
     "SttEvent",
