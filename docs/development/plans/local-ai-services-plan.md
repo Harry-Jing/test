@@ -104,5 +104,6 @@
 - 主程序新增 `funasr_local` provider，通过本地 websocket 连接 `vrc-live-caption local-stt serve`。
 - 主程序配置只保留 sidecar 连接信息。
 - FunASR 模型、chunk、VAD、标点和线程等重参数收敛到 `local-stt-funasr.toml`。
-- 第一版默认以 Windows + CPU + `16000 Hz`/mono/`int16` 为唯一主路径。
-- 第一版不包含自动拉起、打包分发、模型自动下载或 GPU 优化。
+- 当前默认设备策略为 `device = "auto"`：在 Windows + NVIDIA + `funasr-cu128` 环境下优先使用 `cuda:0`，否则回退到 CPU。
+- 显式 `device = "cuda"` 采用快速失败策略，不做静默 CPU fallback。
+- 当前 GPU 支持范围仅收敛到 Windows + NVIDIA + cu128；自动拉起、打包分发和模型自动下载仍不在本阶段范围内。

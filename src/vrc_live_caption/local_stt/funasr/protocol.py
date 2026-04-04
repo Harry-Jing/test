@@ -35,9 +35,19 @@ def build_client_stop_message() -> dict[str, Any]:
     return {"type": CLIENT_STOP}
 
 
-def build_ready_message(message: str) -> dict[str, Any]:
+def build_ready_message(
+    message: str,
+    *,
+    resolved_device: str | None = None,
+    device_policy: str | None = None,
+) -> dict[str, Any]:
     """Build the server ready event."""
-    return {"type": SERVER_READY, "message": message}
+    payload: dict[str, Any] = {"type": SERVER_READY, "message": message}
+    if resolved_device is not None:
+        payload["resolved_device"] = resolved_device
+    if device_policy is not None:
+        payload["device_policy"] = device_policy
+    return payload
 
 
 def build_transcript_message(
@@ -73,4 +83,3 @@ def decode_json_message(raw: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("JSON message must decode to an object")
     return value
-

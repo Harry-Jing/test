@@ -455,14 +455,20 @@ def doctor(
     typer.echo(f"[ok] stt backend configured: {describe_stt_backend(app_config.stt)}")
     if app_config.stt.provider == "funasr_local":
         try:
-            asyncio.run(
+            probe_result = asyncio.run(
                 probe_funasr_local_service(
                     capture_config=app_config.capture,
                     provider_config=app_config.stt.providers.funasr_local,
                     timeout_seconds=app_config.stt.retry.connect_timeout_seconds,
                 )
             )
-            typer.echo("[ok] local STT sidecar reachable")
+            if probe_result.resolved_device:
+                suffix = f": {probe_result.resolved_device}"
+                if probe_result.device_policy:
+                    suffix += f" (policy={probe_result.device_policy})"
+                typer.echo(f"[ok] local STT sidecar reachable{suffix}")
+            else:
+                typer.echo("[ok] local STT sidecar reachable")
         except Exception as exc:
             exit_code = 1
             typer.echo(f"[error] local STT sidecar check failed: {exc}")
@@ -648,8 +654,8 @@ def local_stt_serve(
 ) -> None:
     """Run the repository-local FunASR websocket sidecar."""
     try:
-        local_config, resolved_config_path, config_exists = _load_optional_local_stt_config(
-            config
+        local_config, resolved_config_path, config_exists = (
+            _load_optional_local_stt_config(config)
         )
     except ConfigError as exc:
         _exit_with_error(str(exc))
@@ -675,6 +681,7 @@ def local_stt_serve(
         typer.echo(
             f"[warn] local STT config missing: {resolved_config_path} (serve used built-in defaults)"
         )
+    typer.echo(f"Local STT device policy: {local_config.device}")
     typer.echo(f"Starting local FunASR sidecar on ws://{host}:{port}")
 
     try:

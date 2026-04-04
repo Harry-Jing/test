@@ -17,6 +17,16 @@ uv sync
 
 This creates or updates the project environment from `pyproject.toml` and `uv.lock`.
 
+For the local FunASR sidecar, choose one extra before manual validation:
+
+```bash
+uv sync --extra funasr-cpu
+uv sync --extra funasr-cu128
+```
+
+- Use `funasr-cpu` for CPU-only validation.
+- Use `funasr-cu128` on Windows with an NVIDIA GPU when you want the local sidecar to resolve `device = "auto"` to `cuda:0`.
+
 ## Secrets And Config
 
 - Secrets are loaded through `pydantic-settings`.

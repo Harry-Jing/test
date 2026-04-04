@@ -1,5 +1,6 @@
 mode = "2pass"
-device = "cpu"
+# auto prefers cuda:0 when available and falls back to cpu.
+device = "auto"
 ncpu = 4
 offline_asr_model = "paraformer-zh"
 online_asr_model = "paraformer-zh-streaming"

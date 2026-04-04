@@ -15,7 +15,7 @@ def test_local_funasr_config_returns_defaults_when_optional_file_is_missing(
     )
 
     assert config.mode == "2pass"
-    assert config.device == "cpu"
+    assert config.device == "auto"
     assert config.chunk_size == (0, 10, 5)
     assert config.packet_duration_ms == 60
 
@@ -26,6 +26,7 @@ def test_local_funasr_config_parses_example_file() -> None:
     )
 
     assert config.mode == "2pass"
+    assert config.device == "auto"
     assert config.offline_asr_model == "paraformer-zh"
     assert config.online_asr_model == "paraformer-zh-streaming"
 
@@ -35,4 +36,12 @@ def test_local_funasr_config_rejects_invalid_mode(tmp_path: Path) -> None:
     config_path.write_text('mode = "offline"\n', encoding="utf-8")
 
     with pytest.raises(ConfigError, match="mode must be 2pass"):
+        FunasrLocalServiceConfig.from_toml_file(config_path)
+
+
+def test_local_funasr_config_rejects_invalid_device(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad-local-stt-device.toml"
+    config_path.write_text('device = "metal"\n', encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="device must be one of: auto, cpu, cuda"):
         FunasrLocalServiceConfig.from_toml_file(config_path)

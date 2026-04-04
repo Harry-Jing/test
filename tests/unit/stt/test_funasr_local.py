@@ -22,6 +22,8 @@ from vrc_live_caption.stt import AsyncSttSessionRunner, SttStatus
 from vrc_live_caption.stt.funasr_local import (
     FunasrLocalBackend,
     normalize_funasr_local_transcript_event,
+    parse_funasr_local_ready_event,
+    probe_funasr_local_service,
 )
 from vrc_live_caption.stt.types import TranscriptRevisionEvent
 
@@ -69,6 +71,21 @@ def test_normalize_funasr_local_transcript_event_tracks_revisions() -> None:
     assert revisions == {}
 
 
+def test_parse_funasr_local_ready_event_keeps_device_metadata() -> None:
+    ready_event = parse_funasr_local_ready_event(
+        build_ready_message(
+            "ready for test",
+            resolved_device="cuda:0",
+            device_policy="auto",
+        )
+    )
+
+    assert ready_event is not None
+    assert ready_event.message == "ready for test"
+    assert ready_event.resolved_device == "cuda:0"
+    assert ready_event.device_policy == "auto"
+
+
 def test_funasr_local_backend_publishes_ready_and_transcripts() -> None:
     async def scenario() -> None:
         received_messages: list[dict] = []
@@ -109,7 +126,9 @@ def test_funasr_local_backend_publishes_ready_and_transcripts() -> None:
                     provider_config=FunasrLocalProviderConfig(port=port),
                     logger=logging.getLogger("test.funasr_local.backend"),
                 ),
-                retry_config=SttRetryConfig(connect_timeout_seconds=1.0, max_attempts=1),
+                retry_config=SttRetryConfig(
+                    connect_timeout_seconds=1.0, max_attempts=1
+                ),
                 audio_queue=_make_audio_queue(),
                 event_buffer_max_items=16,
                 logger=logging.getLogger("test.funasr_local.runner"),
@@ -119,11 +138,16 @@ def test_funasr_local_backend_publishes_ready_and_transcripts() -> None:
             events = [await runner.get_event(timeout=0.2) for _ in range(4)]
             await runner.close(timeout_seconds=1.0)
             events.extend(
-                [await runner.get_event(timeout=0.2), await runner.get_event(timeout=0.2)]
+                [
+                    await runner.get_event(timeout=0.2),
+                    await runner.get_event(timeout=0.2),
+                ]
             )
 
         statuses = [event.status for event in events if hasattr(event, "status")]
-        transcripts = [event for event in events if isinstance(event, TranscriptRevisionEvent)]
+        transcripts = [
+            event for event in events if isinstance(event, TranscriptRevisionEvent)
+        ]
 
         assert received_messages[0]["type"] == "start"
         assert received_messages[1]["type"] == "stop"
@@ -203,7 +227,9 @@ def test_funasr_local_backend_surfaces_fatal_server_errors() -> None:
                     provider_config=FunasrLocalProviderConfig(port=port),
                     logger=logging.getLogger("test.funasr_local.fatal.backend"),
                 ),
-                retry_config=SttRetryConfig(connect_timeout_seconds=1.0, max_attempts=1),
+                retry_config=SttRetryConfig(
+                    connect_timeout_seconds=1.0, max_attempts=1
+                ),
                 audio_queue=_make_audio_queue(),
                 event_buffer_max_items=16,
                 logger=logging.getLogger("test.funasr_local.fatal.runner"),
@@ -213,5 +239,35 @@ def test_funasr_local_backend_surfaces_fatal_server_errors() -> None:
                 await runner.start()
 
         return None
+
+    asyncio.run(scenario())
+
+
+def test_probe_funasr_local_service_returns_ready_device_metadata() -> None:
+    async def scenario() -> None:
+        async def handler(websocket) -> None:
+            await websocket.recv()
+            await websocket.send(
+                encode_json_message(
+                    build_ready_message(
+                        "ready",
+                        resolved_device="cuda:0",
+                        device_policy="auto",
+                    )
+                )
+            )
+            await websocket.recv()
+
+        async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+            port = server.sockets[0].getsockname()[1]
+            result = await probe_funasr_local_service(
+                capture_config=CaptureConfig(),
+                provider_config=FunasrLocalProviderConfig(port=port),
+                timeout_seconds=1.0,
+            )
+
+        assert result.message == "ready"
+        assert result.resolved_device == "cuda:0"
+        assert result.device_policy == "auto"
 
     asyncio.run(scenario())

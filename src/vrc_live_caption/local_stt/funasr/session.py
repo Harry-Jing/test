@@ -111,12 +111,16 @@ class FunasrWebsocketSession:
         config: FunasrLocalServiceConfig,
         models: FunasrModelBundle,
         executor: Executor | None,
+        resolved_device: str | None = None,
+        device_policy: str | None = None,
         logger,
     ) -> None:
         self._websocket = websocket
         self._config = config
         self._models = models
         self._executor = executor
+        self._resolved_device = resolved_device
+        self._device_policy = device_policy
         self._logger = logger
         self._state = SessionRuntimeState()
         self._closed = False
@@ -207,7 +211,11 @@ class FunasrWebsocketSession:
         }
         self._state.punc_state = {"cache": {}}
         await self._send_json(
-            build_ready_message("FunASR local 2-pass sidecar ready")
+            build_ready_message(
+                "FunASR local 2-pass sidecar ready",
+                resolved_device=self._resolved_device,
+                device_policy=self._device_policy,
+            )
         )
 
     async def _handle_stop(self) -> None:

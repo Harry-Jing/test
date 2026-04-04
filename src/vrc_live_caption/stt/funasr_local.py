@@ -36,6 +36,15 @@ class FatalFunasrLocalServerError(SttProviderFatalError):
     """Raised when the local FunASR sidecar reports a fatal error."""
 
 
+@dataclass(frozen=True, slots=True)
+class FunasrLocalReadyEvent:
+    """Store the ready metadata returned by the local sidecar."""
+
+    message: str
+    resolved_device: str | None = None
+    device_policy: str | None = None
+
+
 @dataclass(slots=True)
 class FunasrLocalConnectionState:
     """Store attempt-scoped transcript revision tracking."""
@@ -89,7 +98,7 @@ async def probe_funasr_local_service(
     capture_config: CaptureConfig,
     provider_config: FunasrLocalProviderConfig,
     timeout_seconds: float = 3.0,
-) -> None:
+) -> FunasrLocalReadyEvent:
     """Verify that the local sidecar accepts a session and reports ready."""
     connection = await asyncio.wait_for(
         connect(
@@ -113,12 +122,13 @@ async def probe_funasr_local_service(
             if isinstance(message, bytes):
                 continue
             event = decode_json_message(message)
-            event_type = _get_value(event, "type")
-            if event_type == "ready":
+            ready_event = parse_funasr_local_ready_event(event)
+            if ready_event is not None:
                 await connection.send(
                     json.dumps(build_client_stop_message(), ensure_ascii=False)
                 )
-                return
+                return ready_event
+            event_type = _get_value(event, "type")
             if event_type == "error":
                 message = _coerce_text(
                     _get_value(event, "message", "FunASR local sidecar error")
@@ -165,10 +175,8 @@ class FunasrLocalAttempt(ConnectionAttempt):
                     channels=self._capture_config.channels,
                 ),
             )
-            await self._await_ready(connection)
-            self._context.mark_ready(
-                f"FunASR local sidecar ready ({self._provider_config.host}:{self._provider_config.port})"
-            )
+            ready_event = await self._await_ready(connection)
+            self._context.mark_ready(self._format_ready_message(ready_event))
 
             receiver_task = asyncio.create_task(self._receive_events(connection))
             sender_task = asyncio.create_task(self._send_audio(connection))
@@ -180,7 +188,9 @@ class FunasrLocalAttempt(ConnectionAttempt):
             if sender_task in done and self._stop_sent:
                 sender_task.result()
                 try:
-                    await asyncio.wait_for(receiver_task, timeout=_FLUSH_TIMEOUT_SECONDS)
+                    await asyncio.wait_for(
+                        receiver_task, timeout=_FLUSH_TIMEOUT_SECONDS
+                    )
                 except asyncio.TimeoutError:
                     await connection.close()
                     await asyncio.gather(receiver_task, return_exceptions=True)
@@ -198,7 +208,7 @@ class FunasrLocalAttempt(ConnectionAttempt):
         finally:
             await connection.close()
 
-    async def _await_ready(self, connection: Any) -> None:
+    async def _await_ready(self, connection: Any) -> FunasrLocalReadyEvent:
         while True:
             message = await asyncio.wait_for(
                 connection.recv(),
@@ -206,8 +216,9 @@ class FunasrLocalAttempt(ConnectionAttempt):
             )
             if isinstance(message, bytes):
                 continue
-            if self._handle_server_message(decode_json_message(message)):
-                return
+            ready_event = self._handle_server_message(decode_json_message(message))
+            if ready_event is not None:
+                return ready_event
 
     async def _send_audio(self, connection: Any) -> None:
         while True:
@@ -239,10 +250,11 @@ class FunasrLocalAttempt(ConnectionAttempt):
                 continue
             self._handle_server_message(decode_json_message(message))
 
-    def _handle_server_message(self, event: Any) -> bool:
+    def _handle_server_message(self, event: Any) -> FunasrLocalReadyEvent | None:
+        ready_event = parse_funasr_local_ready_event(event)
+        if ready_event is not None:
+            return ready_event
         event_type = _get_value(event, "type")
-        if event_type == "ready":
-            return True
         if event_type == "error":
             message = _coerce_text(
                 _get_value(event, "message", "FunASR local sidecar error")
@@ -252,13 +264,13 @@ class FunasrLocalAttempt(ConnectionAttempt):
             self._context.publish_event(
                 SttStatusEvent(status=SttStatus.ERROR, message=message)
             )
-            return False
+            return None
 
         for normalized_event in normalize_funasr_local_transcript_event(
             event, self._state.segment_revisions
         ):
             self._context.publish_event(normalized_event)
-        return False
+        return None
 
     async def _send_stop(self, connection: Any) -> None:
         if self._stop_sent:
@@ -268,6 +280,20 @@ class FunasrLocalAttempt(ConnectionAttempt):
 
     async def _send_json(self, connection: Any, payload: dict[str, Any]) -> None:
         await connection.send(json.dumps(payload, ensure_ascii=False))
+
+    def _format_ready_message(self, ready_event: FunasrLocalReadyEvent) -> str:
+        location = f"{self._provider_config.host}:{self._provider_config.port}"
+        if ready_event.resolved_device:
+            if ready_event.device_policy:
+                return (
+                    "FunASR local sidecar ready "
+                    f"({location}, device={ready_event.resolved_device}, policy={ready_event.device_policy})"
+                )
+            return (
+                "FunASR local sidecar ready "
+                f"({location}, device={ready_event.resolved_device})"
+            )
+        return f"FunASR local sidecar ready ({location})"
 
 
 class FunasrLocalBackend(SttBackend):
@@ -368,6 +394,19 @@ def _build_ssl_context(
     return context
 
 
+def parse_funasr_local_ready_event(event: Any) -> FunasrLocalReadyEvent | None:
+    """Parse one sidecar ready event and keep optional device metadata."""
+    if _get_value(event, "type") != "ready":
+        return None
+    return FunasrLocalReadyEvent(
+        message=_coerce_text(
+            _get_value(event, "message", "FunASR local sidecar ready")
+        ),
+        resolved_device=_coerce_optional_text(_get_value(event, "resolved_device")),
+        device_policy=_coerce_optional_text(_get_value(event, "device_policy")),
+    )
+
+
 def _get_value(value: Any, key: str, default: Any = None) -> Any:
     if isinstance(value, dict):
         return value.get(key, default)
@@ -382,12 +421,21 @@ def _coerce_text(value: Any) -> str:
     return str(value)
 
 
+def _coerce_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = _coerce_text(value).strip()
+    return text or None
+
+
 __all__ = [
     "FatalFunasrLocalServerError",
     "FunasrLocalBackend",
     "FunasrLocalConnectionState",
+    "FunasrLocalReadyEvent",
     "build_funasr_local_url",
     "is_retriable_funasr_local_error",
     "normalize_funasr_local_transcript_event",
+    "parse_funasr_local_ready_event",
     "probe_funasr_local_service",
 ]

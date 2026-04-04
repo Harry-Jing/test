@@ -83,6 +83,8 @@ uv run vrc-live-caption run
 - Before `doctor` or `run`, ensure the credentials required by the selected `stt.provider` are available, or start `vrc-live-caption local-stt serve` when using `funasr_local`.
 - `osc-test` does not require STT credentials.
 - `local-stt serve` uses `local-stt-funasr.toml` when present and otherwise falls back to built-in defaults.
+- Install `uv sync --extra funasr-cpu` for CPU-only local STT validation, or `uv sync --extra funasr-cu128` on Windows/NVIDIA machines for GPU validation.
+- `local-stt-funasr.toml` now defaults to `device = "auto"`, which prefers `cuda:0` when `torch.cuda.is_available()` is true and otherwise falls back to `cpu`.
 
 ## Config Notes
 

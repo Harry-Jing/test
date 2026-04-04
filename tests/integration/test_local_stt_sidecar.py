@@ -16,7 +16,10 @@ from vrc_live_caption.local_stt.funasr.config import FunasrLocalServiceConfig
 from vrc_live_caption.local_stt.funasr.session import FunasrWebsocketSession
 from vrc_live_caption.runtime import AudioChunk, DropOldestAsyncQueue
 from vrc_live_caption.stt import AsyncSttSessionRunner
-from vrc_live_caption.stt.funasr_local import FunasrLocalBackend
+from vrc_live_caption.stt.funasr_local import (
+    FunasrLocalBackend,
+    probe_funasr_local_service,
+)
 from vrc_live_caption.stt.types import TranscriptRevisionEvent
 
 _TEST_WAV_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "audio" / "test.wav"
@@ -67,12 +70,19 @@ def test_local_stt_sidecar_replays_wav_through_websocket_runner() -> None:
                 config=FunasrLocalServiceConfig(chunk_size=(0, 1, 0), chunk_interval=1),
                 models=fake_bundle,
                 executor=None,
+                resolved_device="cuda:0",
+                device_policy="auto",
                 logger=logging.getLogger("test.integration.local_stt.session"),
             )
             await session.run()
 
         async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
             port = server.sockets[0].getsockname()[1]
+            probe_result = await probe_funasr_local_service(
+                capture_config=CaptureConfig(),
+                provider_config=FunasrLocalProviderConfig(port=port),
+                timeout_seconds=1.0,
+            )
             runner = AsyncSttSessionRunner(
                 backend=FunasrLocalBackend(
                     capture_config=CaptureConfig(),
@@ -80,7 +90,9 @@ def test_local_stt_sidecar_replays_wav_through_websocket_runner() -> None:
                     provider_config=FunasrLocalProviderConfig(port=port),
                     logger=logging.getLogger("test.integration.local_stt.backend"),
                 ),
-                retry_config=SttRetryConfig(connect_timeout_seconds=1.0, max_attempts=1),
+                retry_config=SttRetryConfig(
+                    connect_timeout_seconds=1.0, max_attempts=1
+                ),
                 audio_queue=audio_queue,
                 event_buffer_max_items=32,
                 logger=logging.getLogger("test.integration.local_stt.runner"),
@@ -119,6 +131,8 @@ def test_local_stt_sidecar_replays_wav_through_websocket_runner() -> None:
             event for event in events if isinstance(event, TranscriptRevisionEvent)
         ]
 
+        assert probe_result.resolved_device == "cuda:0"
+        assert probe_result.device_policy == "auto"
         assert any(not event.is_final for event in transcripts)
         assert any(event.is_final for event in transcripts)
 

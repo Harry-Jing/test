@@ -11,6 +11,7 @@ from vrc_live_caption.audio import AudioDeviceInfo
 from vrc_live_caption.cli import app
 from vrc_live_caption.config import LogLevel
 from vrc_live_caption.errors import OscError, SecretError
+from vrc_live_caption.stt.funasr_local import FunasrLocalReadyEvent
 
 
 class _FakeOscTransport:
@@ -439,10 +440,15 @@ def test_doctor_checks_local_funasr_sidecar_without_secret_validation(
         "vrc_live_caption.cli.create_osc_chatbox_transport",
         lambda *, app_config, logger: osc_transport,
     )
-    monkeypatch.setattr(
-        "vrc_live_caption.cli.probe_funasr_local_service",
-        lambda **kwargs: asyncio.sleep(0),
-    )
+
+    async def fake_probe(**kwargs):
+        return FunasrLocalReadyEvent(
+            message="ready",
+            resolved_device="cuda:0",
+            device_policy="auto",
+        )
+
+    monkeypatch.setattr("vrc_live_caption.cli.probe_funasr_local_service", fake_probe)
     monkeypatch.setattr(
         "vrc_live_caption.cli.validate_stt_secrets",
         lambda **kwargs: (_ for _ in ()).throw(AssertionError("should not be called")),
@@ -452,7 +458,7 @@ def test_doctor_checks_local_funasr_sidecar_without_secret_validation(
 
     assert result.exit_code == 0
     assert "[ok] stt backend configured: funasr_local" in result.output
-    assert "[ok] local STT sidecar reachable" in result.output
+    assert "[ok] local STT sidecar reachable: cuda:0 (policy=auto)" in result.output
 
 
 def test_local_stt_serve_uses_local_sidecar_entrypoint(
@@ -480,6 +486,7 @@ def test_local_stt_serve_uses_local_sidecar_entrypoint(
     assert result.exit_code == 0
     assert captured["host"] == "127.0.0.1"
     assert captured["port"] == 10095
+    assert "Local STT device policy: auto" in result.output
     assert "Starting local FunASR sidecar on ws://127.0.0.1:10095" in result.output
 
 

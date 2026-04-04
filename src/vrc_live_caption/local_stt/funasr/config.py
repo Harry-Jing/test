@@ -66,7 +66,7 @@ class FunasrLocalServiceConfig(_ConfigModel):
     """Store the sidecar runtime models and inference settings."""
 
     mode: str = "2pass"
-    device: str = "cpu"
+    device: str = "auto"
     ncpu: int = 4
     offline_asr_model: str = "paraformer-zh"
     online_asr_model: str = "paraformer-zh-streaming"
@@ -122,7 +122,9 @@ class FunasrLocalServiceConfig(_ConfigModel):
                 f"Failed to parse local STT TOML config {resolved}: {exc}"
             ) from exc
         except OSError as exc:
-            raise ConfigError(f"Failed to read local STT config {resolved}: {exc}") from exc
+            raise ConfigError(
+                f"Failed to read local STT config {resolved}: {exc}"
+            ) from exc
 
         if not isinstance(data, dict):
             raise ConfigError(
@@ -146,8 +148,8 @@ class FunasrLocalServiceConfig(_ConfigModel):
     @classmethod
     def _validate_device(cls, value: Any) -> str:
         result = _coerce_str(value, "device")
-        if result not in {"cpu", "cuda"}:
-            raise ValueError("device must be one of: cpu, cuda")
+        if result not in {"auto", "cpu", "cuda"}:
+            raise ValueError("device must be one of: auto, cpu, cuda")
         return result
 
     @field_validator(
