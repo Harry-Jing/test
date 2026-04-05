@@ -25,6 +25,11 @@ from .stt import (
     probe_funasr_local_service,
     validate_stt_secrets,
 )
+from .translation import (
+    create_translation_backend,
+    describe_translation_backend,
+    validate_translation_runtime,
+)
 
 _INTERRUPT_EXCEPTIONS = (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
 
@@ -157,6 +162,7 @@ def create_live_pipeline_controller(
     emit_line,
 ) -> LivePipelineController:
     """Build the full async `run` pipeline from capture, STT, and OSC pieces."""
+    secrets = AppSecrets()
     audio_queue = DropOldestAsyncQueue(
         max_items=app_config.pipeline.audio_buffer_max_chunks,
         logger=logger.getChild("queue"),
@@ -171,8 +177,13 @@ def create_live_pipeline_controller(
     backend = create_stt_backend(
         capture_config=app_config.capture,
         stt_config=app_config.stt,
-        secrets=AppSecrets(),
+        secrets=secrets,
         logger=logger.getChild("stt"),
+    )
+    translation_backend = create_translation_backend(
+        translation_config=app_config.translation,
+        secrets=secrets,
+        logger=logger.getChild("translation"),
     )
     session_runner = AsyncSttSessionRunner(
         backend=backend,
@@ -189,6 +200,8 @@ def create_live_pipeline_controller(
         transport=transport,
         emit_line=emit_line,
         logger=logger.getChild("chatbox"),
+        translation_config=app_config.translation,
+        translation_backend=translation_backend,
     )
     return LivePipelineController(
         capture=capture,
@@ -331,6 +344,14 @@ async def _run_live_command(
         )
         typer.echo(f"OSC target: {app_config.osc.host}:{app_config.osc.port}")
         typer.echo(f"STT backend: {controller.backend_description}")
+        if app_config.translation.enabled:
+            typer.echo(
+                "Translation: "
+                f"{describe_translation_backend(app_config.translation)} "
+                f"-> {app_config.translation.target_language} "
+                f"(mode={app_config.translation.output_mode}, "
+                f"strategy={app_config.translation.strategy})"
+            )
         typer.echo("Press Ctrl+C to stop.")
         await controller.run_forever()
     except asyncio.CancelledError:
@@ -484,6 +505,27 @@ def doctor(
             typer.echo(f"[error] {exc}")
             typer.echo(
                 "        Hint: create a .env file in the repo root or export the backend-specific credentials."
+            )
+
+    if app_config.translation.enabled:
+        try:
+            validate_translation_runtime(
+                translation_config=app_config.translation,
+                secrets=AppSecrets(),
+                logger=root_logger.getChild("translation"),
+            )
+            typer.echo(
+                "[ok] translation configured: "
+                f"{describe_translation_backend(app_config.translation)} "
+                f"-> {app_config.translation.target_language} "
+                f"(mode={app_config.translation.output_mode}, "
+                f"strategy={app_config.translation.strategy})"
+            )
+        except (SecretError, VrcLiveCaptionError) as exc:
+            exit_code = 1
+            typer.echo(f"[error] {exc}")
+            typer.echo(
+                "        Hint: set DEEPL_AUTH_KEY for DeepL, or configure Google ADC plus translation.providers.google_cloud.project_id."
             )
 
     raise typer.Exit(code=exit_code)

@@ -81,7 +81,8 @@
 ## 5. 与里程碑的关系
 
 - MVP 仍然坚持 CLI first、cloud STT first、original-language captions first
-- 本规划主要服务于后续本地 STT 与翻译阶段
+- 当前 M6 首版已先落地云端 text-to-text 翻译层，用于验证 `final_only` 翻译、双语输出与主链路解耦
+- 本规划主要服务于后续本地 STT 与本地翻译阶段
 - 本地能力可先以 experimental 形态进入验证
 
 ---
@@ -107,3 +108,8 @@
 - 当前默认设备策略为 `device = "auto"`：在 Windows + NVIDIA + `funasr-cu128` 环境下优先使用 `cuda:0`，否则回退到 CPU。
 - 显式 `device = "cuda"` 采用快速失败策略，不做静默 CPU fallback。
 - 当前 GPU 支持范围仅收敛到 Windows + NVIDIA + cu128；自动拉起、打包分发和模型自动下载仍不在本阶段范围内。
+- 当前翻译层首版仍以云端 provider 为主：
+  - 支持 `deepl` 与 `google_cloud`
+  - 仅支持 `final_only`
+  - LLM API 翻译明确后置到下一版本
+  - 本地翻译仍按 sidecar 或独立本地服务方向规划，而不是并入主程序运行时

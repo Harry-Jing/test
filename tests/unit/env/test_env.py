@@ -104,3 +104,23 @@ def test_app_secrets_ignores_unknown_dotenv_keys(monkeypatch, tmp_cwd: Path) -> 
     secrets = AppSecrets()
 
     assert secrets.require_openai_credentials().api_key == "dotenv-key"
+
+
+def test_app_secrets_reads_deepl_auth_key_from_dotenv(
+    monkeypatch, tmp_cwd: Path
+) -> None:
+    monkeypatch.delenv("DEEPL_AUTH_KEY", raising=False)
+    (tmp_cwd / ".env").write_text('DEEPL_AUTH_KEY="deepl-key"\n', encoding="utf-8")
+
+    secrets = AppSecrets()
+
+    assert secrets.require_deepl_credentials().auth_key == "deepl-key"
+
+
+def test_app_secrets_requires_deepl_auth_key_when_translation_needs_it(
+    monkeypatch, tmp_cwd: Path
+) -> None:
+    monkeypatch.delenv("DEEPL_AUTH_KEY", raising=False)
+
+    with pytest.raises(SecretError, match="DEEPL_AUTH_KEY not found"):
+        AppSecrets().require_deepl_credentials()

@@ -81,6 +81,17 @@ lowercase `x` characters.
 - A short-term fallback could expose a configurable safe budget for CJK-heavy
   text, but that should be treated as a temporary workaround.
 
+## Current Implementation Direction
+
+- `translation.output_mode = "source_target"` now uses the width-estimator path
+  as a configurable stacked two-zone layout:
+  - source paragraph
+  - blank separator line
+  - target paragraph
+- The runtime sends `source\n\ntarget` and lets VRChat handle auto-wrap.
+- `translation.chatbox_layout` exposes the current heuristic so it can be tuned
+  without code changes.
+
 ## Font File Question
 
 Finding the VRChat font file may help extract glyph advance widths, but it is

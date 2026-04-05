@@ -35,6 +35,8 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
         funasr_local_overrides: dict[str, Any] | None = None,
         iflytek_rtasr_overrides: dict[str, Any] | None = None,
         openai_realtime_overrides: dict[str, Any] | None = None,
+        translation_overrides: dict[str, Any] | None = None,
+        google_cloud_translation_overrides: dict[str, Any] | None = None,
     ) -> Path:
         target = path or tmp_path / "app.toml"
         write_test_config(
@@ -50,6 +52,8 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
             funasr_local_overrides=funasr_local_overrides,
             iflytek_rtasr_overrides=iflytek_rtasr_overrides,
             openai_realtime_overrides=openai_realtime_overrides,
+            translation_overrides=translation_overrides,
+            google_cloud_translation_overrides=google_cloud_translation_overrides,
         )
         return target
 

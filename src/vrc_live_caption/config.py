@@ -19,6 +19,11 @@ from .errors import ConfigError
 
 DEFAULT_CONFIG_PATH = Path("vrc-live-caption.toml")
 _SUPPORTED_STT_PROVIDERS = {"funasr_local", "iflytek_rtasr", "openai_realtime"}
+_SUPPORTED_TRANSLATION_PROVIDERS = {"deepl", "google_cloud"}
+_SUPPORTED_TRANSLATION_OUTPUT_MODES = {"source", "target", "source_target"}
+_SUPPORTED_TRANSLATION_STRATEGIES = {"final_only"}
+_SUPPORTED_TRANSLATION_CHATBOX_LAYOUT_MODES = {"stacked_two_zone"}
+_SUPPORTED_TRANSLATION_CHATBOX_WIDTH_MODELS = {"vrchat_v1"}
 
 
 def _coerce_int(value: Any, context: str, *, minimum: int | None = None) -> int:
@@ -511,6 +516,230 @@ class SttConfig(_ConfigModel):
         )
 
 
+class GoogleCloudTranslationProviderConfig(_ConfigModel):
+    """Store Google Cloud Translation project and location settings."""
+
+    project_id: str | None = None
+    location: str = "global"
+
+    @field_validator("project_id", mode="before")
+    @classmethod
+    def _validate_project_id(cls, value: Any) -> str | None:
+        return _coerce_optional_str(
+            value, "translation.providers.google_cloud.project_id"
+        )
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _validate_location(cls, value: Any) -> str:
+        return _coerce_str(value, "translation.providers.google_cloud.location")
+
+
+class TranslationChatboxLayoutWidthsConfig(_ConfigModel):
+    """Store heuristic visual-width weights for VRChat chatbox estimation."""
+
+    cjk: float = 1.93
+    ascii_upper: float = 1.12
+    ascii_lower: float = 1.0
+    ascii_narrow: float = 0.6
+    fallback: float = 1.0
+
+    @field_validator(
+        "cjk",
+        "ascii_upper",
+        "ascii_lower",
+        "ascii_narrow",
+        "fallback",
+        mode="before",
+    )
+    @classmethod
+    def _validate_float_fields(cls, value: Any, info: ValidationInfo) -> float:
+        field_name = info.field_name
+        assert field_name is not None
+        return _coerce_float(
+            value,
+            f"translation.chatbox_layout.widths.{field_name}",
+            minimum=0.1,
+        )
+
+
+class TranslationChatboxLayoutConfig(_ConfigModel):
+    """Store source-target stacked chatbox layout heuristics and budgets."""
+
+    mode: str = "stacked_two_zone"
+    source_visible_lines: int = 4
+    separator_blank_lines: int = 1
+    target_visible_lines: int = 4
+    visual_line_width_units: float = 29.0
+    width_model: str = "vrchat_v1"
+    widths: TranslationChatboxLayoutWidthsConfig = Field(
+        default_factory=TranslationChatboxLayoutWidthsConfig
+    )
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _validate_mode(cls, value: Any) -> str:
+        return _coerce_choice_str(
+            value,
+            "translation.chatbox_layout.mode",
+            allowed=_SUPPORTED_TRANSLATION_CHATBOX_LAYOUT_MODES,
+        )
+
+    @field_validator(
+        "source_visible_lines",
+        "separator_blank_lines",
+        "target_visible_lines",
+        mode="before",
+    )
+    @classmethod
+    def _validate_int_fields(cls, value: Any, info: ValidationInfo) -> int:
+        field_name = info.field_name
+        assert field_name is not None
+        minimums = {
+            "source_visible_lines": 1,
+            "separator_blank_lines": 1,
+            "target_visible_lines": 1,
+        }
+        return _coerce_int(
+            value,
+            f"translation.chatbox_layout.{field_name}",
+            minimum=minimums[field_name],
+        )
+
+    @field_validator("visual_line_width_units", mode="before")
+    @classmethod
+    def _validate_visual_line_width_units(cls, value: Any) -> float:
+        return _coerce_float(
+            value,
+            "translation.chatbox_layout.visual_line_width_units",
+            minimum=0.1,
+        )
+
+    @field_validator("width_model", mode="before")
+    @classmethod
+    def _validate_width_model(cls, value: Any) -> str:
+        return _coerce_choice_str(
+            value,
+            "translation.chatbox_layout.width_model",
+            allowed=_SUPPORTED_TRANSLATION_CHATBOX_WIDTH_MODELS,
+        )
+
+    @model_validator(mode="after")
+    def _validate_total_visible_lines(self) -> Self:
+        total_visible_lines = (
+            self.source_visible_lines
+            + self.separator_blank_lines
+            + self.target_visible_lines
+        )
+        if total_visible_lines > 9:
+            raise ValueError(
+                "translation.chatbox_layout source_visible_lines + "
+                "separator_blank_lines + target_visible_lines must be <= 9"
+            )
+        return self
+
+
+class TranslationProvidersConfig(_ConfigModel):
+    """Store provider-specific translation configuration blocks."""
+
+    google_cloud: GoogleCloudTranslationProviderConfig = Field(
+        default_factory=GoogleCloudTranslationProviderConfig
+    )
+
+
+class TranslationConfig(_ConfigModel):
+    """Store the translation feature toggle, provider, and rendering policy."""
+
+    enabled: bool = False
+    provider: str = "deepl"
+    target_language: str | None = None
+    source_language: str | None = None
+    output_mode: str = "source_target"
+    strategy: str = "final_only"
+    request_timeout_seconds: float = 3.0
+    max_pending_finals: int = 8
+    chatbox_layout: TranslationChatboxLayoutConfig = Field(
+        default_factory=TranslationChatboxLayoutConfig
+    )
+    providers: TranslationProvidersConfig = Field(
+        default_factory=TranslationProvidersConfig
+    )
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def _validate_enabled(cls, value: Any) -> bool:
+        return _coerce_bool(value, "translation.enabled")
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def _validate_provider(cls, value: Any) -> str:
+        return _coerce_choice_str(
+            value,
+            "translation.provider",
+            allowed=_SUPPORTED_TRANSLATION_PROVIDERS,
+        )
+
+    @field_validator("target_language", "source_language", mode="before")
+    @classmethod
+    def _validate_optional_language(
+        cls, value: Any, info: ValidationInfo
+    ) -> str | None:
+        return _coerce_optional_str(value, f"translation.{info.field_name}")
+
+    @field_validator("output_mode", mode="before")
+    @classmethod
+    def _validate_output_mode(cls, value: Any) -> str:
+        return _coerce_choice_str(
+            value,
+            "translation.output_mode",
+            allowed=_SUPPORTED_TRANSLATION_OUTPUT_MODES,
+        )
+
+    @field_validator("strategy", mode="before")
+    @classmethod
+    def _validate_strategy(cls, value: Any) -> str:
+        return _coerce_choice_str(
+            value,
+            "translation.strategy",
+            allowed=_SUPPORTED_TRANSLATION_STRATEGIES,
+        )
+
+    @field_validator("request_timeout_seconds", mode="before")
+    @classmethod
+    def _validate_request_timeout(cls, value: Any) -> float:
+        return _coerce_float(
+            value,
+            "translation.request_timeout_seconds",
+            minimum=0.1,
+        )
+
+    @field_validator("max_pending_finals", mode="before")
+    @classmethod
+    def _validate_max_pending_finals(cls, value: Any) -> int:
+        return _coerce_int(
+            value,
+            "translation.max_pending_finals",
+            minimum=1,
+        )
+
+    @model_validator(mode="after")
+    def _validate_enabled_requirements(self) -> Self:
+        if not self.enabled:
+            return self
+        if self.target_language is None:
+            raise ValueError(
+                "translation.target_language is required when translation.enabled = true"
+            )
+        if (
+            self.provider == "google_cloud"
+            and self.providers.google_cloud.project_id is None
+        ):
+            raise ValueError(
+                'translation.providers.google_cloud.project_id is required when translation.provider = "google_cloud"'
+            )
+        return self
+
+
 class AppConfig(_ConfigModel):
     """Store the full application config tree with validated subsystem defaults."""
 
@@ -520,6 +749,7 @@ class AppConfig(_ConfigModel):
     debug: DebugConfig = Field(default_factory=DebugConfig)
     osc: OscConfig = Field(default_factory=OscConfig)
     stt: SttConfig = Field(default_factory=SttConfig)
+    translation: TranslationConfig = Field(default_factory=TranslationConfig)
 
     @classmethod
     def default_path(cls) -> Path:
@@ -573,9 +803,14 @@ __all__ = [
     "OpenAIRealtimeProviderConfig",
     "OscConfig",
     "PipelineConfig",
+    "GoogleCloudTranslationProviderConfig",
     "SttConfig",
     "SttProvidersConfig",
     "SttRetryConfig",
+    "TranslationChatboxLayoutConfig",
+    "TranslationChatboxLayoutWidthsConfig",
+    "TranslationConfig",
+    "TranslationProvidersConfig",
     "parse_device_value",
     "parse_log_level",
 ]

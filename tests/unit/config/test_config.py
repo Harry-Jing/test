@@ -6,10 +6,14 @@ from vrc_live_caption.config import (
     AppConfig,
     ConfigError,
     FunasrLocalProviderConfig,
+    GoogleCloudTranslationProviderConfig,
     IflytekRtasrProviderConfig,
     LogLevel,
     OscConfig,
     SttConfig,
+    TranslationChatboxLayoutConfig,
+    TranslationChatboxLayoutWidthsConfig,
+    TranslationConfig,
     parse_device_value,
 )
 
@@ -32,6 +36,15 @@ def test_load_app_config_returns_defaults_when_optional_file_is_missing(
     assert config.stt.providers.iflytek_rtasr.language == "autodialect"
     assert config.stt.providers.iflytek_rtasr.vad_mode == "near_field"
     assert config.stt.providers.openai_realtime.model == "gpt-4o-transcribe"
+    assert config.translation.enabled is False
+    assert config.translation.provider == "deepl"
+    assert config.translation.output_mode == "source_target"
+    assert config.translation.chatbox_layout.mode == "stacked_two_zone"
+    assert config.translation.chatbox_layout.source_visible_lines == 4
+    assert config.translation.chatbox_layout.separator_blank_lines == 1
+    assert config.translation.chatbox_layout.target_visible_lines == 4
+    assert config.translation.chatbox_layout.visual_line_width_units == 29.0
+    assert config.translation.chatbox_layout.width_model == "vrchat_v1"
 
 
 def test_load_app_config_rejects_unknown_keys(tmp_path: Path) -> None:
@@ -111,6 +124,35 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
                 "vad_prefix_padding_ms = 450",
                 "vad_silence_duration_ms = 700",
                 "vad_threshold = 0.4",
+                "",
+                "[translation]",
+                "enabled = true",
+                'provider = "google_cloud"',
+                'target_language = "en"',
+                'source_language = "zh"',
+                'output_mode = "source_target"',
+                'strategy = "final_only"',
+                "request_timeout_seconds = 4.5",
+                "max_pending_finals = 3",
+                "",
+                "[translation.chatbox_layout]",
+                'mode = "stacked_two_zone"',
+                "source_visible_lines = 3",
+                "separator_blank_lines = 1",
+                "target_visible_lines = 4",
+                "visual_line_width_units = 31.5",
+                'width_model = "vrchat_v1"',
+                "",
+                "[translation.chatbox_layout.widths]",
+                "cjk = 2.1",
+                "ascii_upper = 1.2",
+                "ascii_lower = 1.0",
+                "ascii_narrow = 0.5",
+                "fallback = 1.1",
+                "",
+                "[translation.providers.google_cloud]",
+                'project_id = "test-project"',
+                'location = "global"',
             ]
         ),
         encoding="utf-8",
@@ -137,6 +179,14 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
     assert config.stt.providers.openai_realtime.model == "gpt-4o-transcribe"
     assert config.stt.providers.openai_realtime.language == "zh"
     assert config.stt.providers.openai_realtime.noise_reduction == "far_field"
+    assert config.translation.enabled is True
+    assert config.translation.provider == "google_cloud"
+    assert config.translation.target_language == "en"
+    assert config.translation.chatbox_layout.source_visible_lines == 3
+    assert config.translation.chatbox_layout.visual_line_width_units == 31.5
+    assert config.translation.chatbox_layout.widths.cjk == 2.1
+    assert config.translation.chatbox_layout.widths.ascii_narrow == 0.5
+    assert config.translation.providers.google_cloud.project_id == "test-project"
 
 
 def test_load_app_config_rejects_invalid_stt_backoff_range(tmp_path: Path) -> None:
@@ -223,6 +273,68 @@ def test_stt_config_default_models_do_not_share_nested_instances() -> None:
     assert first.providers.funasr_local is not second.providers.funasr_local
     assert first.providers.iflytek_rtasr is not second.providers.iflytek_rtasr
     assert first.providers.openai_realtime is not second.providers.openai_realtime
+
+
+def test_translation_config_requires_target_language_when_enabled() -> None:
+    with pytest.raises(ValueError, match="translation.target_language is required"):
+        TranslationConfig(enabled=True)
+
+
+def test_translation_config_requires_google_project_id_when_enabled() -> None:
+    with pytest.raises(
+        ValueError,
+        match="translation.providers.google_cloud.project_id is required",
+    ):
+        TranslationConfig(enabled=True, provider="google_cloud", target_language="en")
+
+
+def test_translation_config_accepts_deepl_defaults_when_disabled() -> None:
+    config = TranslationConfig()
+
+    assert config.enabled is False
+    assert config.provider == "deepl"
+    assert config.chatbox_layout == TranslationChatboxLayoutConfig()
+
+
+def test_translation_config_rejects_invalid_output_mode() -> None:
+    with pytest.raises(ValueError, match="translation.output_mode must be one of"):
+        TranslationConfig(output_mode="dual")
+
+
+def test_translation_config_rejects_invalid_chatbox_layout_mode() -> None:
+    with pytest.raises(
+        ValueError,
+        match="translation.chatbox_layout.mode must be one of",
+    ):
+        TranslationConfig(chatbox_layout=TranslationChatboxLayoutConfig(mode="grid"))
+
+
+def test_translation_config_rejects_chatbox_layout_that_exceeds_nine_lines() -> None:
+    with pytest.raises(
+        ValueError,
+        match="source_visible_lines \\+ separator_blank_lines \\+ target_visible_lines must be <= 9",
+    ):
+        TranslationConfig(
+            chatbox_layout=TranslationChatboxLayoutConfig(
+                source_visible_lines=5,
+                separator_blank_lines=1,
+                target_visible_lines=4,
+            )
+        )
+
+
+def test_translation_chatbox_layout_widths_require_positive_values() -> None:
+    with pytest.raises(
+        ValueError,
+        match="translation.chatbox_layout.widths.cjk must be >=",
+    ):
+        TranslationChatboxLayoutWidthsConfig(cjk=0.0)
+
+
+def test_google_cloud_translation_provider_config_defaults_location() -> None:
+    config = GoogleCloudTranslationProviderConfig(project_id="test-project")
+
+    assert config.location == "global"
 
 
 def test_stt_config_accepts_openai_provider_selection() -> None:

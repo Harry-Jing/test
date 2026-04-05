@@ -20,6 +20,10 @@ Current contents:
   - replays `tests/fixtures/audio/test.wav`
   - drives the async STT runner against the real OpenAI realtime transcription API
   - asserts readiness, graceful shutdown, and keyword-based transcript success
+- `test_translation_live.py`
+  - sends short text requests to the real DeepL or Google Cloud Translation API
+  - validates basic provider setup plus non-empty translated output
+  - requires billable translation credentials and network access
 
 For execution details, prerequisites, and the explicit command, use
 `docs/development/testing.md`.

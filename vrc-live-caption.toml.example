@@ -55,3 +55,32 @@ turn_detection = "server_vad"
 vad_prefix_padding_ms = 300
 vad_silence_duration_ms = 500
 vad_threshold = 0.5
+
+[translation]
+enabled = false
+provider = "deepl"
+target_language = "en"
+source_language = "zh"
+output_mode = "source_target"
+strategy = "final_only"
+request_timeout_seconds = 3.0
+max_pending_finals = 8
+
+[translation.chatbox_layout]
+mode = "stacked_two_zone"
+source_visible_lines = 4
+separator_blank_lines = 1
+target_visible_lines = 4
+visual_line_width_units = 29.0
+width_model = "vrchat_v1"
+
+[translation.chatbox_layout.widths]
+cjk = 1.93
+ascii_upper = 1.12
+ascii_lower = 1.0
+ascii_narrow = 0.6
+fallback = 1.0
+
+[translation.providers.google_cloud]
+project_id = "replace-me"
+location = "global"

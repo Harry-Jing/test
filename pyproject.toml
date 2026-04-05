@@ -18,6 +18,8 @@ dependencies = [
     "sounddevice>=0.5.5",
     "typer>=0.24.1",
     "websockets>=16.0",
+    "deepl>=1.29.0",
+    "google-cloud-translate>=3.25.0",
 ]
 
 [project.scripts]
@@ -96,6 +98,8 @@ addopts = '-m "not integration and not openai_live and not iflytek_live"'
 testpaths = ["tests"]
 markers = [
     "integration: external service or end-to-end tests that are excluded from default pytest runs",
+    "deepl_live: tests that call the real DeepL API and require DEEPL_AUTH_KEY plus network access",
+    "google_translate_live: tests that call the real Google Cloud Translation API and require ADC plus GOOGLE_TRANSLATE_PROJECT_ID",
     "openai_live: tests that call the real OpenAI API and require OPENAI_API_KEY plus network access",
     "iflytek_live: tests that call the real iFLYTEK RTASR API and require IFLYTEK_* credentials plus network access",
 ]

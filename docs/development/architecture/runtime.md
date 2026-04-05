@@ -63,6 +63,7 @@ This document records the current runtime contract for the async capture-to-capt
 - `vrc_live_caption.audio` owns device discovery, backend protocols, and the `sounddevice` adapter.
 - `vrc_live_caption.runtime` owns capture services, bounded async queues, and recording sinks.
 - `vrc_live_caption.stt` owns backend selection, runner lifecycle, provider connection attempts, and transcript normalization.
+- `vrc_live_caption.translation` owns final-only text translation providers, bounded request queues, and translation environment validation.
 - `vrc_live_caption.chatbox` owns stabilization, pacing, and OSC-facing output state.
 - `vrc_live_caption.cli` composes validated config, secrets, logging, and the top-level pipeline controller; it does not own runtime internals.
 
@@ -76,4 +77,5 @@ This document records the current runtime contract for the async capture-to-capt
 
 - Heartbeat logs are emitted by the pipeline controller rather than by capture internals.
 - Heartbeat entries include the resolved device label, audio queue depth, audio drops, and dropped STT event count.
+- When translated output is enabled, heartbeat entries also include translation queue depth plus dropped, failed, and stale translation counts.
 - Logs avoid printing raw audio content and focus on device, queue, state, and error context.

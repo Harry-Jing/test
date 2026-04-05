@@ -66,6 +66,17 @@ uv run pytest -q tests/integration/test_local_stt_sidecar.py -m integration
 - Starts a local websocket sidecar in-process with fake inference models and replays `tests/fixtures/audio/test.wav` through the `funasr_local` runner path.
 - This verifies the repository-local websocket protocol, transcript normalization, and shutdown behavior without loading real FunASR models.
 
+### Cloud Translation
+
+```bash
+uv run pytest -q tests/integration/test_translation_live.py -m "integration and deepl_live"
+uv run pytest -q tests/integration/test_translation_live.py -m "integration and google_translate_live"
+```
+
+- DeepL live tests require `DEEPL_AUTH_KEY` and outbound network access.
+- Google Cloud live tests require ADC, `GOOGLE_TRANSLATE_PROJECT_ID`, and outbound network access.
+- Both translation test paths are billable and excluded from default `pytest` runs.
+
 ## Manual Runtime Validation
 
 Use a native Windows terminal for microphone and audio-device validation:
@@ -92,3 +103,5 @@ uv run vrc-live-caption run
 - Pipeline queue and shutdown settings live under `[pipeline]`.
 - Retry policy lives under `[stt.retry]`.
 - Provider-specific blocks live under `[stt.providers.<provider>]`.
+- Translation settings live under `[translation]`.
+- Google Cloud Translation provider settings live under `[translation.providers.google_cloud]`.

@@ -13,6 +13,7 @@ Development documents for `VRC Live Caption`.
 - [Runtime](./architecture/runtime.md): current capture-to-pipeline contract, queue ownership, and CLI/runtime boundaries
 - [STT](./architecture/stt.md): backend selection, async runner lifecycle, retry behavior, and connection-attempt boundaries
 - [Caption And OSC](./architecture/caption-and-osc.md): caption stabilization, chatbox pacing, OSC output, and diagnostics behavior
+- [Translation](./architecture/translation.md): final-only text translation flow, provider boundaries, and stacked source-target chatbox rendering
 
 ## Plans
 

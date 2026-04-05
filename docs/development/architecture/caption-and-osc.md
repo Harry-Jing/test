@@ -36,6 +36,11 @@ It originated in M3 and remains the source of truth for VRChat-facing text behav
   - the active utterance continues on the right in the same line
 - This document does not emit explicit newlines for layout control
 - the merged chatbox text is clipped from the left to stay within `144` characters, preserving the newest tail of the line
+- when translated output is enabled:
+  - pending translated finals stay source-only until translation completes
+  - `target` mode replaces finalized entries with translated text once translation completes
+  - `source_target` mode renders `source_paragraph\n\ntarget_paragraph`
+  - `source_target` uses a stacked two-zone heuristic: source and target are clipped independently by visual-width estimates, the blank separator line is explicit, and the final OSC payload still stays within `144` characters
 
 ## Pacing And CLI Behavior
 

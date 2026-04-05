@@ -81,6 +81,10 @@ class ConsoleTranscriptOutput:
         """Console output has nothing buffered."""
         return None
 
+    def diagnostics_snapshot(self) -> dict[str, int]:
+        """Return an empty diagnostics snapshot for heartbeat logging."""
+        return {}
+
 
 class LivePipelineController:
     """Coordinate capture, STT, and transcript output within one asyncio loop."""
@@ -247,13 +251,30 @@ class LivePipelineController:
             if self.capture.resolved_device is not None
             else "unresolved"
         )
+        diagnostics_snapshot = getattr(
+            self.transcript_output,
+            "diagnostics_snapshot",
+            lambda: {},
+        )()
+        translation_suffix = ""
+        if diagnostics_snapshot:
+            translation_suffix = (
+                " translation_pending=%s translation_dropped=%s"
+                " translation_failed=%s translation_stale=%s"
+            ) % (
+                diagnostics_snapshot.get("translation_pending", 0),
+                diagnostics_snapshot.get("translation_dropped", 0),
+                diagnostics_snapshot.get("translation_failed", 0),
+                diagnostics_snapshot.get("translation_stale", 0),
+            )
         self._logger.info(
-            "Pipeline heartbeat: device=%s audio_queue=%s/%s dropped_audio=%s dropped_events=%s",
+            "Pipeline heartbeat: device=%s audio_queue=%s/%s dropped_audio=%s dropped_events=%s%s",
             device_label,
             self._audio_queue.qsize(),
             self._audio_queue.max_items,
             self._audio_queue.dropped_items,
             self.session_runner.event_dropped_items,
+            translation_suffix,
         )
 
     def _time_until_heartbeat(self) -> float:

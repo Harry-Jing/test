@@ -915,3 +915,123 @@ def test_doctor_reports_osc_configuration_errors(
 
     assert result.exit_code == 1
     assert "[error] osc target configuration failed: bad osc" in result.output
+
+
+def test_doctor_validates_deepl_translation_when_enabled(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    backend = FakeBackend()
+    osc_transport = _FakeOscTransport()
+    config_path = config_file_factory(
+        translation_overrides={
+            "enabled": True,
+            "provider": "deepl",
+            "target_language": "en",
+            "output_mode": "source_target",
+        }
+    )
+    monkeypatch.setattr("vrc_live_caption.cli.create_audio_backend", lambda: backend)
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_osc_chatbox_transport",
+        lambda *, app_config, logger: osc_transport,
+    )
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.validate_translation_runtime",
+        lambda **kwargs: None,
+    )
+
+    result = cli_runner.invoke(
+        app,
+        ["doctor", "--config", str(config_path)],
+        env={
+            "IFLYTEK_APP_ID": "app-id",
+            "IFLYTEK_API_KEY": "api-key",
+            "IFLYTEK_API_SECRET": "api-secret",
+        },
+    )
+
+    assert result.exit_code == 0
+    assert "[ok] translation configured: deepl -> en" in result.output
+
+
+def test_doctor_reports_missing_deepl_secret_when_translation_enabled(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    backend = FakeBackend()
+    osc_transport = _FakeOscTransport()
+    config_path = config_file_factory(
+        translation_overrides={
+            "enabled": True,
+            "provider": "deepl",
+            "target_language": "en",
+        }
+    )
+    monkeypatch.setattr("vrc_live_caption.cli.create_audio_backend", lambda: backend)
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_osc_chatbox_transport",
+        lambda *, app_config, logger: osc_transport,
+    )
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.validate_translation_runtime",
+        lambda **kwargs: (_ for _ in ()).throw(
+            SecretError(
+                "DEEPL_AUTH_KEY not found. Add it to .env or set the environment variable."
+            )
+        ),
+    )
+
+    result = cli_runner.invoke(app, ["doctor", "--config", str(config_path)])
+
+    assert result.exit_code == 1
+    assert "DEEPL_AUTH_KEY not found" in result.output
+
+
+def test_run_prints_translation_summary_when_enabled(
+    monkeypatch,
+    config_file_factory,
+    cli_runner,
+) -> None:
+    class FakeController:
+        def __init__(self) -> None:
+            self.resolved_device = AudioDeviceInfo(
+                index=7,
+                name="Fake Mic",
+                max_input_channels=1,
+                default_sample_rate=16_000.0,
+                is_default=True,
+            )
+            self.backend_description = "iflytek_rtasr (autodialect, near_field)"
+
+        async def start(self) -> None:
+            return None
+
+        async def run_forever(self) -> None:
+            raise KeyboardInterrupt
+
+        async def stop(self) -> None:
+            return None
+
+    config_path = config_file_factory(
+        translation_overrides={
+            "enabled": True,
+            "provider": "deepl",
+            "target_language": "en",
+            "output_mode": "source_target",
+        }
+    )
+    monkeypatch.setattr(
+        "vrc_live_caption.cli.create_live_pipeline_controller",
+        lambda *, app_config, logger, emit_line: FakeController(),
+    )
+
+    result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (
+        "Translation: deepl -> en (mode=source_target, strategy=final_only)"
+        in result.output
+    )

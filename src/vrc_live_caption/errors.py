@@ -45,6 +45,10 @@ class SttProviderRetriableError(SttError):
     """Raised when an STT provider reports a retriable failure."""
 
 
+class TranslationError(VrcLiveCaptionError):
+    """Raised when the translation subsystem cannot start or continue."""
+
+
 class PipelineError(VrcLiveCaptionError):
     """Raised when the transcription pipeline cannot continue cleanly."""
 
@@ -66,5 +70,6 @@ __all__ = [
     "SttProviderFatalError",
     "SttProviderRetriableError",
     "SttSessionError",
+    "TranslationError",
     "VrcLiveCaptionError",
 ]

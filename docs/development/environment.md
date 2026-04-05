@@ -33,6 +33,8 @@ uv sync --extra funasr-cu128
 - Copy `.env.example` to `.env` when local secrets are needed.
 - The default OpenAI backend requires `OPENAI_API_KEY`.
 - The optional iFLYTEK backend requires `IFLYTEK_APP_ID`, `IFLYTEK_API_KEY`, and `IFLYTEK_API_SECRET`.
+- The optional DeepL translation backend requires `DEEPL_AUTH_KEY`.
+- The optional Google Cloud Translation backend uses ADC plus `translation.providers.google_cloud.project_id`.
 - Process environment variables override `.env`.
 - Use `.env` for secrets only.
 - Ordinary runtime configuration still comes from `vrc-live-caption.toml`.

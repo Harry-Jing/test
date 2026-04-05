@@ -25,6 +25,9 @@ _MISSING_IFLYTEK_API_KEY_MESSAGE = (
 _MISSING_IFLYTEK_API_SECRET_MESSAGE = (
     "IFLYTEK_API_SECRET not found. Add it to .env or set the environment variable."
 )
+_MISSING_DEEPL_AUTH_KEY_MESSAGE = (
+    "DEEPL_AUTH_KEY not found. Add it to .env or set the environment variable."
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -41,6 +44,13 @@ class IflytekCredentials:
     app_id: str
     api_key: str
     api_secret: str
+
+
+@dataclass(slots=True, frozen=True)
+class DeepLCredentials:
+    """Store the complete credential set required for DeepL translation access."""
+
+    auth_key: str
 
 
 class AppSecrets(BaseSettings):
@@ -73,12 +83,17 @@ class AppSecrets(BaseSettings):
         default=None,
         validation_alias=AliasChoices("iflytek_api_secret", "IFLYTEK_API_SECRET"),
     )
+    deepl_auth_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("deepl_auth_key", "DEEPL_AUTH_KEY"),
+    )
 
     @field_validator(
         "openai_api_key",
         "iflytek_app_id",
         "iflytek_api_key",
         "iflytek_api_secret",
+        "deepl_auth_key",
         mode="before",
     )
     @classmethod
@@ -113,6 +128,15 @@ class AppSecrets(BaseSettings):
             api_secret=_require_secret(
                 self.iflytek_api_secret, _MISSING_IFLYTEK_API_SECRET_MESSAGE
             ),
+        )
+
+    def require_deepl_credentials(self) -> DeepLCredentials:
+        """Return complete DeepL credentials or raise if the auth key is missing."""
+        return DeepLCredentials(
+            auth_key=_require_secret(
+                self.deepl_auth_key,
+                _MISSING_DEEPL_AUTH_KEY_MESSAGE,
+            )
         )
 
 

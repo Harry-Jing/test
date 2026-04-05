@@ -7,6 +7,7 @@ from vrc_live_caption.config import (
     CaptureConfig,
     DebugConfig,
     FunasrLocalProviderConfig,
+    GoogleCloudTranslationProviderConfig,
     IflytekRtasrProviderConfig,
     LoggingConfig,
     LogLevel,
@@ -16,6 +17,8 @@ from vrc_live_caption.config import (
     SttConfig,
     SttProvidersConfig,
     SttRetryConfig,
+    TranslationConfig,
+    TranslationProvidersConfig,
 )
 
 
@@ -62,6 +65,12 @@ def build_config(tmp_path: Path, **capture_overrides: object) -> AppConfig:
                 openai_realtime=OpenAIRealtimeProviderConfig(),
             ),
         ),
+        translation=TranslationConfig(
+            enabled=False,
+            providers=TranslationProvidersConfig(
+                google_cloud=GoogleCloudTranslationProviderConfig()
+            ),
+        ),
     )
 
 
@@ -79,6 +88,8 @@ def write_test_config(
     funasr_local_overrides: Mapping[str, object] | None = None,
     iflytek_rtasr_overrides: Mapping[str, object] | None = None,
     openai_realtime_overrides: Mapping[str, object] | None = None,
+    translation_overrides: Mapping[str, object] | None = None,
+    google_cloud_translation_overrides: Mapping[str, object] | None = None,
 ) -> Path:
     capture_values: dict[str, object] = {
         "sample_rate": 16_000,
@@ -133,6 +144,17 @@ def write_test_config(
         "vad_silence_duration_ms": 500,
         "vad_threshold": 0.5,
     }
+    translation_values: dict[str, object] = {
+        "enabled": False,
+        "provider": "deepl",
+        "output_mode": "source_target",
+        "strategy": "final_only",
+        "request_timeout_seconds": 3.0,
+        "max_pending_finals": 8,
+    }
+    google_cloud_translation_values: dict[str, object] = {
+        "location": "global",
+    }
 
     capture_values.update(audio_overrides or {})
     capture_values.update(capture_overrides or {})
@@ -159,6 +181,8 @@ def write_test_config(
     funasr_local_values.update(funasr_local_overrides or {})
     iflytek_rtasr_values.update(iflytek_rtasr_overrides or {})
     openai_realtime_values.update(openai_realtime_overrides or {})
+    translation_values.update(translation_overrides or {})
+    google_cloud_translation_values.update(google_cloud_translation_overrides or {})
 
     sections = [
         ("capture", capture_values),
@@ -171,6 +195,11 @@ def write_test_config(
         ("stt.providers.funasr_local", funasr_local_values),
         ("stt.providers.iflytek_rtasr", iflytek_rtasr_values),
         ("stt.providers.openai_realtime", openai_realtime_values),
+        ("translation", translation_values),
+        (
+            "translation.providers.google_cloud",
+            google_cloud_translation_values,
+        ),
     ]
     lines: list[str] = []
     for section_name, values in sections:
