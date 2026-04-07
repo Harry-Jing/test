@@ -110,6 +110,14 @@ def text_fits(text: str, *, max_lines: int, max_chars: int | None = None) -> boo
     return len(wrap_text(normalized, stop_after_lines=max_lines + 1)) <= max_lines
 
 
+def wrapped_line_count(text: str) -> int:
+    """Return how many visual lines the current text occupies."""
+    normalized = normalize_chatbox_text(text)
+    if not normalized:
+        return 0
+    return len(wrap_text(normalized))
+
+
 def render_zone_text(
     fragments: list[str] | tuple[str, ...],
     *,
@@ -156,6 +164,48 @@ def select_tail_fragments(
         clipped = clip_fragment_tail_to_context(
             fragment,
             suffix_fragments=suffix_fragments,
+            max_lines=max_lines,
+            max_chars=max_chars,
+        )
+        if clipped:
+            selected_reversed.append(clipped)
+        break
+
+    return list(reversed(selected_reversed))
+
+
+def select_tail_fragments_with_suffix(
+    candidate_fragments: list[str] | tuple[str, ...],
+    *,
+    suffix_fragments: list[str] | tuple[str, ...],
+    max_lines: int,
+    max_chars: int | None = None,
+) -> list[str]:
+    """Select the newest candidate tail that fits ahead of a fixed suffix."""
+    normalized_candidates = [
+        normalized
+        for fragment in candidate_fragments
+        if (normalized := normalize_chatbox_text(fragment))
+    ]
+    fixed_suffix = [
+        normalized
+        for fragment in suffix_fragments
+        if (normalized := normalize_chatbox_text(fragment))
+    ]
+    if not normalized_candidates:
+        return []
+
+    selected_reversed: list[str] = []
+    for fragment in reversed(normalized_candidates):
+        suffix = [*reversed(selected_reversed), *fixed_suffix]
+        candidate_text = join_display_fragments([fragment, *suffix])
+        if text_fits(candidate_text, max_lines=max_lines, max_chars=max_chars):
+            selected_reversed.append(fragment)
+            continue
+
+        clipped = clip_fragment_tail_to_context(
+            fragment,
+            suffix_fragments=suffix,
             max_lines=max_lines,
             max_chars=max_chars,
         )

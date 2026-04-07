@@ -7,6 +7,32 @@ MID = "\u4e2d"
 IDEOGRAPHIC_PERIOD = "\u3002"
 
 
+def _final_event(
+    utterance_id: str, text: str, *, revision: int = 1
+) -> TranscriptRevisionEvent:
+    return TranscriptRevisionEvent(
+        utterance_id=utterance_id,
+        revision=revision,
+        text=text,
+        is_final=True,
+    )
+
+
+def _translation_result(
+    utterance_id: str,
+    source_text: str,
+    translated_text: str,
+    *,
+    revision: int = 1,
+) -> TranslationResult:
+    return TranslationResult(
+        utterance_id=utterance_id,
+        revision=revision,
+        source_text=source_text,
+        translated_text=translated_text,
+    )
+
+
 def test_state_machine_rollover_commits_only_stable_prefix() -> None:
     state = ChatboxStateMachine()
 
@@ -102,23 +128,13 @@ def test_translated_state_machine_keeps_source_visible_until_translation_arrives
     state = TranslatedChatboxStateMachine(output_mode="source_target")
 
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-1",
-            revision=1,
-            text="hello world",
-            is_final=True,
-        ),
+        _final_event("utt-1", "hello world"),
         translation_pending=True,
     )
     assert state.snapshot().text == "hello world\n\n"
 
     state.apply_translation_result(
-        TranslationResult(
-            utterance_id="utt-1",
-            revision=1,
-            source_text="hello world",
-            translated_text="target world",
-        )
+        _translation_result("utt-1", "hello world", "target world")
     )
     assert state.snapshot().text == "hello world\n\ntarget world"
 
@@ -129,29 +145,14 @@ def test_translated_state_machine_keeps_previous_target_context_until_new_transl
     state = TranslatedChatboxStateMachine(output_mode="source_target")
 
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-1",
-            revision=1,
-            text="source one.",
-            is_final=True,
-        ),
+        _final_event("utt-1", "source one."),
         translation_pending=True,
     )
     state.apply_translation_result(
-        TranslationResult(
-            utterance_id="utt-1",
-            revision=1,
-            source_text="source one.",
-            translated_text="target one.",
-        )
+        _translation_result("utt-1", "source one.", "target one.")
     )
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-2",
-            revision=1,
-            text="source two.",
-            is_final=True,
-        ),
+        _final_event("utt-2", "source two."),
         translation_pending=True,
     )
 
@@ -174,21 +175,11 @@ def test_translated_state_machine_source_target_pending_stays_within_source_zone
     sentence = (MID * 14) + IDEOGRAPHIC_PERIOD
 
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-1",
-            revision=1,
-            text=sentence,
-            is_final=True,
-        ),
+        _final_event("utt-1", sentence),
         translation_pending=True,
     )
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-2",
-            revision=1,
-            text=sentence,
-            is_final=True,
-        ),
+        _final_event("utt-2", sentence),
         translation_pending=True,
     )
 
@@ -205,21 +196,11 @@ def test_translated_state_machine_target_mode_uses_single_top_zone() -> None:
     )
 
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-1",
-            revision=1,
-            text="source one.",
-            is_final=True,
-        ),
+        _final_event("utt-1", "source one."),
         translation_pending=True,
     )
     state.apply_translation_result(
-        TranslationResult(
-            utterance_id="utt-1",
-            revision=1,
-            source_text="source one.",
-            translated_text="target one.",
-        )
+        _translation_result("utt-1", "source one.", "target one.")
     )
     state.apply_revision(
         TranscriptRevisionEvent(
@@ -248,23 +229,101 @@ def test_translated_state_machine_source_target_char_budget_can_borrow() -> None
     source_text = "abcdefghijklmnopqrst"
 
     state.apply_revision(
-        TranscriptRevisionEvent(
-            utterance_id="utt-1",
-            revision=1,
-            text=source_text,
-            is_final=True,
-        ),
+        _final_event("utt-1", source_text),
         translation_pending=True,
     )
-    state.apply_translation_result(
-        TranslationResult(
-            utterance_id="utt-1",
-            revision=1,
-            source_text=source_text,
-            translated_text="z",
-        )
-    )
+    state.apply_translation_result(_translation_result("utt-1", source_text, "z"))
 
     snapshot = state.snapshot()
     assert snapshot.upper_text == "defghijklmnopqrst"
     assert snapshot.lower_text == "z"
+
+
+def test_translated_state_machine_source_target_keeps_same_pair_range() -> None:
+    state = TranslatedChatboxStateMachine(
+        output_mode="source_target",
+        chatbox_layout=TranslationChatboxLayoutConfig(
+            source_visible_lines=1,
+            separator_blank_lines=1,
+            target_visible_lines=1,
+        ),
+    )
+
+    state.apply_revision(_final_event("utt-1", "甲。"), translation_pending=True)
+    state.apply_translation_result(_translation_result("utt-1", "甲。", "older target"))
+    state.apply_revision(_final_event("utt-2", "乙。"), translation_pending=True)
+    state.apply_translation_result(_translation_result("utt-2", "乙。", "x" * 29))
+
+    snapshot = state.snapshot()
+    assert snapshot.upper_text == "乙。"
+    assert snapshot.lower_text == "x" * 29
+
+
+def test_translated_state_machine_source_target_allows_asymmetric_clip_inside_pair() -> (
+    None
+):
+    state = TranslatedChatboxStateMachine(
+        output_mode="source_target",
+        chatbox_layout=TranslationChatboxLayoutConfig(
+            source_visible_lines=1,
+            separator_blank_lines=1,
+            target_visible_lines=1,
+        ),
+    )
+
+    state.apply_revision(_final_event("utt-1", "旧。"), translation_pending=True)
+    state.apply_translation_result(_translation_result("utt-1", "旧。", "old."))
+    state.apply_revision(_final_event("utt-2", "新。"), translation_pending=True)
+    state.apply_translation_result(_translation_result("utt-2", "新。", "x" * 35))
+
+    snapshot = state.snapshot()
+    assert snapshot.upper_text == "新。"
+    assert snapshot.lower_text == "x" * 29
+
+
+def test_translated_state_machine_source_target_failure_keeps_source_tail_visible() -> (
+    None
+):
+    state = TranslatedChatboxStateMachine(output_mode="source_target")
+
+    state.apply_revision(_final_event("utt-1", "source one."), translation_pending=True)
+    state.apply_translation_result(
+        _translation_result("utt-1", "source one.", "target one.")
+    )
+    state.apply_revision(_final_event("utt-2", "source two."), translation_pending=True)
+
+    before_failure = state.snapshot()
+    assert before_failure.upper_text == "source one. source two."
+    assert before_failure.lower_text == "target one."
+
+    assert state.mark_translation_failed("utt-2", 1) is False
+
+    after_failure = state.snapshot()
+    assert after_failure.upper_text == "source one. source two."
+    assert after_failure.lower_text == "target one."
+
+
+def test_translated_state_machine_source_only_tail_has_char_priority_over_pairs() -> (
+    None
+):
+    state = TranslatedChatboxStateMachine(
+        output_mode="source_target",
+        chatbox_layout=TranslationChatboxLayoutConfig(
+            source_visible_lines=2,
+            separator_blank_lines=1,
+            target_visible_lines=1,
+        ),
+        max_chatbox_chars=20,
+    )
+
+    state.apply_revision(
+        _final_event("utt-1", "older source"), translation_pending=True
+    )
+    state.apply_translation_result(
+        _translation_result("utt-1", "older source", "older target")
+    )
+    state.apply_revision(_final_event("utt-2", "." * 30), translation_pending=True)
+
+    snapshot = state.snapshot()
+    assert snapshot.upper_text == "." * 18
+    assert snapshot.lower_text == ""

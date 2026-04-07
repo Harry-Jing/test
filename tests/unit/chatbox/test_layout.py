@@ -1,4 +1,9 @@
-from vrc_live_caption.chatbox.layout import render_zone_text, wrap_text
+from vrc_live_caption.chatbox.layout import (
+    render_zone_text,
+    select_tail_fragments_with_suffix,
+    wrap_text,
+    wrapped_line_count,
+)
 
 MID = "\u4e2d"
 FULLWIDTH_COMMA = "\uff0c"
@@ -65,3 +70,19 @@ def test_render_zone_text_never_inserts_manual_newlines_inside_zone() -> None:
     rendered = render_zone_text(["hello world.", "next sentence."], max_lines=2)
 
     assert "\n" not in rendered
+
+
+def test_wrapped_line_count_matches_visual_wrap() -> None:
+    assert wrapped_line_count("") == 0
+    assert wrapped_line_count("x" * 29) == 1
+    assert wrapped_line_count("x" * 30) == 2
+
+
+def test_select_tail_fragments_with_suffix_clips_only_candidate_portion() -> None:
+    selected = select_tail_fragments_with_suffix(
+        ["x" * 20],
+        suffix_fragments=["x" * 10],
+        max_lines=1,
+    )
+
+    assert selected == ["x" * 18]

@@ -41,6 +41,13 @@ target paragraph
 - Pending translated finals remain visible in the source paragraph until translation completes.
 - The target paragraph keeps the most recent completed translation history; pending finals do not clear it.
 - `source_target` keeps a strict wrapped-line budget even while translation is pending; source does not borrow the reserved target area.
+- `source_target` builds the upper paragraph from two layers:
+  - one source-only tail made from active partials plus finalized source entries that still have no translation result
+  - one aligned bilingual history made from completed source/target utterance pairs
+- Completed bilingual history is selected pair-aware:
+  - the renderer greedily keeps the newest translated utterance pairs together
+  - if the oldest kept pair does not fit, only that pair may be tail-clipped, and source/target may clip to different depths while still representing the same pair
+  - the renderer does not fill leftover space with unmatched older source-only or target-only history
 - `translation.chatbox_layout` controls only the stacked bilingual line split:
   - `source_visible_lines`
   - `separator_blank_lines`
@@ -50,4 +57,6 @@ target paragraph
   - primary sentence terminators are `。！？.!?`
   - one sentence alone may be clipped only after the renderer fails to keep it whole, and the clipped result preserves the sentence tail
 - Wrap simulation is driven by the fixed VRChat TMP/font model from `docs/development/plans/VRChat_ChatBox_Final_Report.md`, not by a configurable heuristic width model.
-- The renderer first clips each visible zone independently by the real wrap simulator, then applies the final `144`-character hard limit while keeping source and target budgets independent.
+- The renderer first decides the source-only tail and the aligned translated pairs by the real wrap simulator, then applies the final `144`-character hard limit:
+  - source-only tail characters and the separator are reserved first
+  - the remaining character budget is shared only by the aligned translated pairs, with unused budget still allowed to flow to the other side

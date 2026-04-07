@@ -41,7 +41,9 @@ It originated in M3 and remains the source of truth for VRChat-facing text behav
   - `source` mode renders one single top zone using `translation.chatbox_layout.source_visible_lines`
   - `target` mode also renders one single top zone and uses translated finals when they are available, while active partial preview stays source-language
   - `source_target` mode always reserves a strict `source_visible_lines + separator_blank_lines + target_visible_lines` layout and renders `source_paragraph\n\ntarget_paragraph`
-  - `source_target` clips source and target independently with the shared font/TMP wrap simulator first, then applies the final `144`-character cap as a safety guard while allowing unused character budget to flow to the other side
+  - `source_target` keeps untranslated source as a source-only tail in the upper zone, then selects completed translated utterance pairs together so the visible source and target history cover the same pair range
+  - when the oldest visible pair does not fit, `source_target` may tail-clip that pair asymmetrically inside the pair, but it does not fill leftover space with unmatched older history from only one side
+  - after line-based selection, `source_target` reserves character budget for the source-only tail and separator first, then lets the remaining pair budget flow between source and target if one side needs fewer characters
 
 ## Pacing And CLI Behavior
 

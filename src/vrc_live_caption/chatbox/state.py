@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -12,9 +13,13 @@ from ..translation import TranslationResult
 from .layout import (
     allocate_stacked_content_budgets,
     render_zone_text,
+    select_tail_fragments,
+    select_tail_fragments_with_suffix,
+    wrapped_line_count,
 )
 from .model import MAX_CHATBOX_CHARS, MAX_CHATBOX_LINES, MAX_RECENT_CLOSED_UTTERANCES
 from .text import (
+    join_display_fragments,
     longest_common_prefix,
     merge_chatbox_text,
     normalize_chatbox_text,
@@ -47,6 +52,12 @@ class _ClosedUtterance:
     source_text: str
     target_text: str | None = None
     translation_pending: bool = False
+
+
+@dataclass(slots=True, frozen=True)
+class _AlignedPair:
+    source_fragments: tuple[str, ...]
+    target_fragments: tuple[str, ...]
 
 
 class _ChatboxStateMachineProtocol(Protocol):
@@ -161,34 +172,90 @@ class TranslatedChatboxStateMachine:
 
     def _snapshot_source_target(self) -> ChatboxSnapshot:
         layout = self._chatbox_layout
-        source_fragments = self._source_fragments()
-        target_fragments = self._target_fragments()
-        source_text = render_zone_text(
-            source_fragments,
-            max_lines=layout.source_visible_lines,
-        )
-        target_text = render_zone_text(
-            target_fragments,
-            max_lines=layout.target_visible_lines,
-        )
         separator = "\n" * (layout.separator_blank_lines + 1)
-        source_budget, target_budget = allocate_stacked_content_budgets(
-            source_text=source_text,
-            target_text=target_text,
-            separator=separator,
-            max_chars=self._max_chatbox_chars,
-            source_visible_lines=layout.source_visible_lines,
-            target_visible_lines=layout.target_visible_lines,
-        )
-        source_text = render_zone_text(
-            source_fragments,
+
+        source_only_fragments = self._source_only_fragments()
+        source_only_selected = select_tail_fragments(
+            source_only_fragments,
             max_lines=layout.source_visible_lines,
-            max_chars=source_budget,
         )
-        target_text = render_zone_text(
-            target_fragments,
-            max_lines=layout.target_visible_lines,
-            max_chars=target_budget,
+        source_only_text = join_display_fragments(source_only_selected)
+        source_only_lines = wrapped_line_count(source_only_text)
+
+        raw_pairs = self._select_aligned_pairs(
+            self._aligned_pairs(),
+            source_suffix_fragments=source_only_selected,
+            source_max_lines=layout.source_visible_lines,
+            target_max_lines=layout.target_visible_lines,
+        )
+        raw_pair_source_text = join_display_fragments(
+            self._flatten_pair_fragments(raw_pairs, side="source")
+        )
+        raw_pair_target_text = join_display_fragments(
+            self._flatten_pair_fragments(raw_pairs, side="target")
+        )
+
+        has_content = bool(
+            source_only_text or raw_pair_source_text or raw_pair_target_text
+        )
+        separator_chars = len(separator) if has_content else 0
+        content_budget = max(0, self._max_chatbox_chars - separator_chars)
+
+        budgeted_source_only_selected = select_tail_fragments(
+            source_only_fragments,
+            max_lines=layout.source_visible_lines,
+            max_chars=content_budget,
+        )
+        budgeted_source_only_text = join_display_fragments(
+            budgeted_source_only_selected
+        )
+        source_boundary_chars = self._display_join_overhead(
+            raw_pair_source_text,
+            budgeted_source_only_text,
+        )
+        remaining_budget = max(
+            0,
+            content_budget - len(budgeted_source_only_text) - source_boundary_chars,
+        )
+
+        source_pair_visible_lines = max(
+            0, layout.source_visible_lines - source_only_lines
+        )
+        final_pairs: list[_AlignedPair] = []
+        if raw_pairs and remaining_budget > 0 and source_pair_visible_lines > 0:
+            source_budget, target_budget = allocate_stacked_content_budgets(
+                source_text=raw_pair_source_text,
+                target_text=raw_pair_target_text,
+                separator="",
+                max_chars=remaining_budget,
+                source_visible_lines=source_pair_visible_lines,
+                target_visible_lines=layout.target_visible_lines,
+            )
+            final_pairs = self._select_aligned_pairs(
+                raw_pairs,
+                source_suffix_fragments=budgeted_source_only_selected,
+                source_max_lines=layout.source_visible_lines,
+                target_max_lines=layout.target_visible_lines,
+                source_max_chars=(
+                    len(budgeted_source_only_text)
+                    + source_boundary_chars
+                    + source_budget
+                ),
+                target_max_chars=target_budget,
+            )
+
+        aligned_source_text = join_display_fragments(
+            self._flatten_pair_fragments(final_pairs, side="source")
+        )
+        target_text = join_display_fragments(
+            self._flatten_pair_fragments(final_pairs, side="target")
+        )
+        source_text = join_display_fragments(
+            [
+                fragment
+                for fragment in (aligned_source_text, budgeted_source_only_text)
+                if fragment
+            ]
         )
         rendered = ""
         if source_text or target_text:
@@ -307,14 +374,34 @@ class TranslatedChatboxStateMachine:
     def _mark_closed(self, utterance_id: str) -> None:
         self._closed_utterance_ids.add(utterance_id)
 
-    def _source_fragments(self) -> list[str]:
-        fragments = list(split_sentences(self._merged_closed_history_text("source")))
+    def _source_only_fragments(self) -> list[str]:
+        history = ""
+        for entry in self._closed_entries:
+            if entry.target_text is not None:
+                continue
+            history = merge_chatbox_text(history, entry.source_text)
+
+        fragments = list(split_sentences(history))
         if self._active is not None and self._active.text:
             fragments.append(self._active.text)
         return fragments
 
-    def _target_fragments(self) -> list[str]:
-        return list(split_sentences(self._merged_closed_history_text("target")))
+    def _aligned_pairs(self) -> list[_AlignedPair]:
+        pairs: list[_AlignedPair] = []
+        for entry in self._closed_entries:
+            if entry.target_text is None:
+                continue
+            source_fragments = split_sentences(entry.source_text)
+            target_fragments = split_sentences(entry.target_text)
+            if not source_fragments or not target_fragments:
+                continue
+            pairs.append(
+                _AlignedPair(
+                    source_fragments=source_fragments,
+                    target_fragments=target_fragments,
+                )
+            )
+        return pairs
 
     def _single_zone_fragments(self) -> list[str]:
         history_key = "source" if self._output_mode == "source" else "visible"
@@ -322,6 +409,139 @@ class TranslatedChatboxStateMachine:
         if self._active is not None and self._active.text:
             fragments.append(self._active.text)
         return fragments
+
+    def _select_aligned_pairs(
+        self,
+        pairs: list[_AlignedPair],
+        *,
+        source_suffix_fragments: list[str],
+        source_max_lines: int,
+        target_max_lines: int,
+        source_max_chars: int | None = None,
+        target_max_chars: int | None = None,
+    ) -> list[_AlignedPair]:
+        selected_reversed: list[_AlignedPair] = []
+        for pair in reversed(pairs):
+            source_suffix = self._source_pair_suffix_fragments(
+                selected_reversed,
+                source_suffix_fragments,
+            )
+            target_suffix = self._target_pair_suffix_fragments(selected_reversed)
+            if self._pair_fits(
+                pair,
+                source_suffix_fragments=source_suffix,
+                target_suffix_fragments=target_suffix,
+                source_max_lines=source_max_lines,
+                target_max_lines=target_max_lines,
+                source_max_chars=source_max_chars,
+                target_max_chars=target_max_chars,
+            ):
+                selected_reversed.append(pair)
+                continue
+
+            clipped = self._clip_pair_to_suffix(
+                pair,
+                source_suffix_fragments=source_suffix,
+                target_suffix_fragments=target_suffix,
+                source_max_lines=source_max_lines,
+                target_max_lines=target_max_lines,
+                source_max_chars=source_max_chars,
+                target_max_chars=target_max_chars,
+            )
+            if clipped is not None:
+                selected_reversed.append(clipped)
+            break
+
+        return list(reversed(selected_reversed))
+
+    def _pair_fits(
+        self,
+        pair: _AlignedPair,
+        *,
+        source_suffix_fragments: list[str],
+        target_suffix_fragments: list[str],
+        source_max_lines: int,
+        target_max_lines: int,
+        source_max_chars: int | None,
+        target_max_chars: int | None,
+    ) -> bool:
+        source_text = join_display_fragments(
+            [*pair.source_fragments, *source_suffix_fragments]
+        )
+        target_text = join_display_fragments(
+            [*pair.target_fragments, *target_suffix_fragments]
+        )
+        return (
+            wrapped_line_count(source_text) <= source_max_lines
+            and wrapped_line_count(target_text) <= target_max_lines
+            and (source_max_chars is None or len(source_text) <= source_max_chars)
+            and (target_max_chars is None or len(target_text) <= target_max_chars)
+        )
+
+    def _clip_pair_to_suffix(
+        self,
+        pair: _AlignedPair,
+        *,
+        source_suffix_fragments: list[str],
+        target_suffix_fragments: list[str],
+        source_max_lines: int,
+        target_max_lines: int,
+        source_max_chars: int | None,
+        target_max_chars: int | None,
+    ) -> _AlignedPair | None:
+        source_fragments = select_tail_fragments_with_suffix(
+            pair.source_fragments,
+            suffix_fragments=source_suffix_fragments,
+            max_lines=source_max_lines,
+            max_chars=source_max_chars,
+        )
+        target_fragments = select_tail_fragments_with_suffix(
+            pair.target_fragments,
+            suffix_fragments=target_suffix_fragments,
+            max_lines=target_max_lines,
+            max_chars=target_max_chars,
+        )
+        if not source_fragments or not target_fragments:
+            return None
+        return _AlignedPair(
+            source_fragments=tuple(source_fragments),
+            target_fragments=tuple(target_fragments),
+        )
+
+    def _source_pair_suffix_fragments(
+        self,
+        selected_reversed: list[_AlignedPair],
+        source_suffix_fragments: list[str],
+    ) -> list[str]:
+        return [
+            *self._flatten_pair_fragments(reversed(selected_reversed), side="source"),
+            *source_suffix_fragments,
+        ]
+
+    def _target_pair_suffix_fragments(
+        self,
+        selected_reversed: list[_AlignedPair],
+    ) -> list[str]:
+        return self._flatten_pair_fragments(reversed(selected_reversed), side="target")
+
+    def _flatten_pair_fragments(
+        self,
+        pairs: Iterable[_AlignedPair],
+        *,
+        side: str,
+    ) -> list[str]:
+        fragments: list[str] = []
+        for pair in pairs:
+            if side == "source":
+                fragments.extend(pair.source_fragments)
+            else:
+                fragments.extend(pair.target_fragments)
+        return fragments
+
+    def _display_join_overhead(self, left: str, right: str) -> int:
+        if not left or not right:
+            return 0
+        return len(join_display_fragments([left, right])) - len(left) - len(right)
 
     def _merged_closed_history_text(self, mode: str) -> str:
         history = ""
