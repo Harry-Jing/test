@@ -2,7 +2,7 @@ import builtins
 
 import pytest
 
-from tests.support.audio_fakes import FakeSounddeviceModule, FakeSounddeviceStream
+from tests.support.fakes.audio import FakeSounddeviceModule, FakeSounddeviceStream
 from vrc_live_caption.audio import (
     AudioBackendError,
     SoundDeviceBackend,

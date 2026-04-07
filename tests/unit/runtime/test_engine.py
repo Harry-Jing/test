@@ -3,13 +3,13 @@ import logging
 
 import pytest
 
-from tests.support.audio_fakes import FakeBackend, FakeStream
-from tests.support.config_helpers import build_config
+from tests.support.builders.config import build_config
+from tests.support.fakes.audio import FakeAudioBackend, FakeStream
 from vrc_live_caption.errors import AudioRuntimeError
 from vrc_live_caption.runtime import DropOldestAsyncQueue, MicrophoneCapture
 
 
-class _RecordingBackend(FakeBackend):
+class _RecordingBackend(FakeAudioBackend):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.open_calls = 0
@@ -46,7 +46,7 @@ class _BrokenStream(FakeStream):
         super().close()
 
 
-class _BrokenBackend(FakeBackend):
+class _BrokenBackend(FakeAudioBackend):
     def __init__(
         self,
         *,
@@ -69,7 +69,7 @@ class _BrokenBackend(FakeBackend):
 def test_microphone_capture_starts_and_emits_audio(tmp_path) -> None:
     async def scenario() -> None:
         config = build_config(tmp_path)
-        backend = FakeBackend()
+        backend = FakeAudioBackend()
         queue = DropOldestAsyncQueue(
             max_items=4,
             logger=logging.getLogger("test.capture.queue"),
@@ -111,7 +111,7 @@ def test_microphone_capture_surfaces_start_failures(tmp_path) -> None:
         capture = MicrophoneCapture(
             capture_config=config.capture,
             queue=queue,
-            backend=FakeBackend(fail_on_start=True),
+            backend=FakeAudioBackend(fail_on_start=True),
             logger=logging.getLogger("test.capture.error"),
         )
 
@@ -156,7 +156,7 @@ def test_microphone_capture_stop_is_noop_when_never_started(tmp_path) -> None:
                 logger=logging.getLogger("test.capture.noop.queue"),
                 label="audio queue",
             ),
-            backend=FakeBackend(),
+            backend=FakeAudioBackend(),
             logger=logging.getLogger("test.capture.noop"),
         )
 
@@ -203,7 +203,7 @@ def test_microphone_capture_stream_callback_ignores_missing_loop(tmp_path) -> No
     capture = MicrophoneCapture(
         capture_config=config.capture,
         queue=queue,
-        backend=FakeBackend(),
+        backend=FakeAudioBackend(),
         logger=logging.getLogger("test.capture.callback"),
     )
 
@@ -218,7 +218,7 @@ def test_microphone_capture_stream_callback_logs_status_and_increments_sequence(
 ) -> None:
     async def scenario() -> None:
         config = build_config(tmp_path)
-        backend = FakeBackend()
+        backend = FakeAudioBackend()
         queue = DropOldestAsyncQueue(
             max_items=4,
             logger=logging.getLogger("test.capture.status.queue"),

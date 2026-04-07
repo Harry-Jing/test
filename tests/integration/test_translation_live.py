@@ -14,8 +14,9 @@ from vrc_live_caption.errors import SecretError
 from vrc_live_caption.translation import create_translation_backend
 from vrc_live_caption.translation.types import TranslationRequest
 
+pytestmark = [pytest.mark.integration, pytest.mark.live]
 
-@pytest.mark.integration
+
 @pytest.mark.deepl_live
 def test_deepl_translation_backend_live() -> None:
     if not os.getenv("DEEPL_AUTH_KEY"):
@@ -46,7 +47,6 @@ def test_deepl_translation_backend_live() -> None:
     assert result.translated_text
 
 
-@pytest.mark.integration
 @pytest.mark.google_translate_live
 def test_google_cloud_translation_backend_live() -> None:
     project_id = os.getenv("GOOGLE_TRANSLATE_PROJECT_ID")

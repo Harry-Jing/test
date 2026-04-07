@@ -49,7 +49,7 @@ class FakeAttempt(ConnectionAttempt):
         await self.context.stop_requested.wait()
 
 
-class FakeBackend(SttBackend):
+class FakeSttBackend(SttBackend):
     name = "fake"
 
     def __init__(

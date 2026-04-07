@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from tests.support.config_helpers import write_test_config
+from tests.support.builders.config import write_test_config
 
 
 @pytest.fixture
@@ -36,6 +36,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
         iflytek_rtasr_overrides: dict[str, Any] | None = None,
         openai_realtime_overrides: dict[str, Any] | None = None,
         translation_overrides: dict[str, Any] | None = None,
+        translation_chatbox_layout_overrides: dict[str, Any] | None = None,
         google_cloud_translation_overrides: dict[str, Any] | None = None,
     ) -> Path:
         target = path or tmp_path / "app.toml"
@@ -53,6 +54,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
             iflytek_rtasr_overrides=iflytek_rtasr_overrides,
             openai_realtime_overrides=openai_realtime_overrides,
             translation_overrides=translation_overrides,
+            translation_chatbox_layout_overrides=translation_chatbox_layout_overrides,
             google_cloud_translation_overrides=google_cloud_translation_overrides,
         )
         return target

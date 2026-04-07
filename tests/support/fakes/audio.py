@@ -35,7 +35,7 @@ class FakeStream:
         self._callback(payload, resolved_frames, None, status)
 
 
-class FakeBackend:
+class FakeAudioBackend:
     def __init__(
         self,
         *,

@@ -1,13 +1,13 @@
 import pytest
 
-from tests.support.stt_live import (
+from tests.support.harnesses.live_stt import (
     assert_live_transcription_result,
     build_live_app_config,
     run_live_stt_fixture,
 )
 from vrc_live_caption.env import AppSecrets, SecretError
 
-pytestmark = [pytest.mark.integration, pytest.mark.iflytek_live]
+pytestmark = [pytest.mark.integration, pytest.mark.live, pytest.mark.iflytek_live]
 
 
 def test_iflytek_rtasr_live_transcribes_fixture() -> None:

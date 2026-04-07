@@ -33,6 +33,7 @@ dev = [
     "coverage>=7.13.5",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
     "ruff>=0.15.8",
     "ty>=0.0.26",
 ]
@@ -97,14 +98,16 @@ convention = "google"
 exclude = ["docs"]
 
 [tool.pytest.ini_options]
-addopts = '-m "not integration and not openai_live and not iflytek_live"'
+# Keep the default test flow fast, offline, and non-billable.
+addopts = '--strict-markers -m "not integration and not live"'
 testpaths = ["tests"]
 markers = [
-    "integration: external service or end-to-end tests that are excluded from default pytest runs",
-    "deepl_live: tests that call the real DeepL API and require DEEPL_AUTH_KEY plus network access",
-    "google_translate_live: tests that call the real Google Cloud Translation API and require ADC plus GOOGLE_TRANSLATE_PROJECT_ID",
-    "openai_live: tests that call the real OpenAI API and require OPENAI_API_KEY plus network access",
-    "iflytek_live: tests that call the real iFLYTEK RTASR API and require IFLYTEK_* credentials plus network access",
+    "integration: tests that exercise cross-subsystem or end-to-end behavior and are excluded from default pytest runs",
+    "live: tests that call real external services, require network access and credentials, and may be billable; excluded from default pytest runs",
+    "deepl_live: live tests for the DeepL API; requires DEEPL_AUTH_KEY",
+    "google_translate_live: live tests for Google Cloud Translation; requires ADC plus GOOGLE_TRANSLATE_PROJECT_ID",
+    "openai_live: live tests for the OpenAI API; requires OPENAI_API_KEY",
+    "iflytek_live: live tests for the iFLYTEK RTASR API; requires IFLYTEK_APP_ID, IFLYTEK_API_KEY, and IFLYTEK_API_SECRET",
 ]
 
 [tool.coverage.run]

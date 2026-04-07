@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from tests.support.replay import iter_wav_chunks
+from tests.support.harnesses.audio import iter_wav_chunks
 from vrc_live_caption.config import (
     AppConfig,
     CaptureConfig,
@@ -28,7 +28,7 @@ from vrc_live_caption.stt import (
 )
 
 _EVENT_POLL_TIMEOUT_SECONDS = 0.1
-_TEST_WAV_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "audio" / "test.wav"
+_TEST_WAV_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "audio" / "test.wav"
 
 DEFAULT_LIVE_KEYWORD_GROUPS = (
     ("测试音频", "测试"),
@@ -123,9 +123,7 @@ def run_live_stt_fixture(
     )
 
 
-def assert_live_transcription_result(
-    result: LiveSttHarnessResult,
-) -> None:
+def assert_live_transcription_result(result: LiveSttHarnessResult) -> None:
     assert result.start_error is None, result.diagnostics
     assert result.replay_error is None, result.diagnostics
     assert result.close_error is None, result.diagnostics

@@ -5,10 +5,11 @@ end-to-end runtime behavior.
 
 Current policy:
 
-- default `uv run pytest -q` excludes `integration`, `openai_live`, and
-  `iflytek_live` tests
+- default `uv run pytest -q` excludes `integration` and `live` tests
 - tests here may require network access, real credentials, or billable API usage
-- live tests stay out of the default unit-test flow
+- provider-specific live markers stay available for targeted runs within the
+  broader `live` category
+- run marker-filtered subsets with `uv run pytest -q -m "<marker expression>"`
 
 Current contents:
 

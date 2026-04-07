@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from websockets.asyncio.server import serve
 
-from tests.support.replay import iter_wav_chunks
+from tests.support.harnesses.audio import iter_wav_chunks
 from vrc_live_caption.config import (
     CaptureConfig,
     FunasrLocalProviderConfig,
