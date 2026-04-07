@@ -20,6 +20,9 @@ dependencies = [
     "websockets>=16.0",
     "deepl>=1.29.0",
     "google-cloud-translate>=3.25.0",
+    "uharfbuzz>=0.53.6",
+    "uniseg>=0.10.1",
+    "fonttools>=4.62.1",
 ]
 
 [project.scripts]

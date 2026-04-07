@@ -71,15 +71,6 @@ mode = "stacked_two_zone"
 source_visible_lines = 4
 separator_blank_lines = 1
 target_visible_lines = 4
-visual_line_width_units = 29.0
-width_model = "vrchat_v1"
-
-[translation.chatbox_layout.widths]
-cjk = 1.93
-ascii_upper = 1.12
-ascii_lower = 1.0
-ascii_narrow = 0.6
-fallback = 1.0
 
 [translation.providers.google_cloud]
 project_id = "replace-me"

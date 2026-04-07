@@ -27,8 +27,8 @@ This document records the current translation-layer contract introduced in M6.
 
 ## Rendering Contract
 
-- `translation.output_mode = "source"` preserves the existing source-only chatbox behavior.
-- `translation.output_mode = "target"` shows source preview while speaking, then replaces finalized entries with target-language text when translation completes.
+- `translation.output_mode = "source"` renders source text only in one single top zone sized by `translation.chatbox_layout.source_visible_lines`.
+- `translation.output_mode = "target"` shows source preview while speaking, then replaces finalized entries with target-language text when translation completes inside that same single top zone.
 - `translation.output_mode = "source_target"` renders one stacked source-target snapshot shaped as:
 
 ```text
@@ -40,11 +40,14 @@ target paragraph
 - The runtime sends `source_paragraph + "\n\n" + target_paragraph` and relies on VRChat auto-wrap instead of explicitly splitting source and target into multiple lines.
 - Pending translated finals remain visible in the source paragraph until translation completes.
 - The target paragraph keeps the most recent completed translation history; pending finals do not clear it.
-- `translation.chatbox_layout` controls the stacked bilingual heuristic:
+- `source_target` keeps a strict wrapped-line budget even while translation is pending; source does not borrow the reserved target area.
+- `translation.chatbox_layout` controls only the stacked bilingual line split:
   - `source_visible_lines`
   - `separator_blank_lines`
   - `target_visible_lines`
-  - `visual_line_width_units`
-  - `width_model`
-  - `widths.*`
-- The renderer first clips source and target paragraphs independently by visual-width budget, then applies a final `144`-character hard limit while keeping source and target budgets independent.
+- Finalized history is rendered sentence-first:
+  - whole sentences are preferred over partial tails
+  - primary sentence terminators are `。！？.!?`
+  - one sentence alone may be clipped only after the renderer fails to keep it whole, and the clipped result preserves the sentence tail
+- Wrap simulation is driven by the fixed VRChat TMP/font model from `docs/development/plans/VRChat_ChatBox_Final_Report.md`, not by a configurable heuristic width model.
+- The renderer first clips each visible zone independently by the real wrap simulator, then applies the final `144`-character hard limit while keeping source and target budgets independent.

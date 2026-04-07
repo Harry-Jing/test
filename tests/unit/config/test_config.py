@@ -12,7 +12,6 @@ from vrc_live_caption.config import (
     OscConfig,
     SttConfig,
     TranslationChatboxLayoutConfig,
-    TranslationChatboxLayoutWidthsConfig,
     TranslationConfig,
     parse_device_value,
 )
@@ -43,8 +42,6 @@ def test_load_app_config_returns_defaults_when_optional_file_is_missing(
     assert config.translation.chatbox_layout.source_visible_lines == 4
     assert config.translation.chatbox_layout.separator_blank_lines == 1
     assert config.translation.chatbox_layout.target_visible_lines == 4
-    assert config.translation.chatbox_layout.visual_line_width_units == 29.0
-    assert config.translation.chatbox_layout.width_model == "vrchat_v1"
 
 
 def test_load_app_config_rejects_unknown_keys(tmp_path: Path) -> None:
@@ -140,15 +137,6 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
                 "source_visible_lines = 3",
                 "separator_blank_lines = 1",
                 "target_visible_lines = 4",
-                "visual_line_width_units = 31.5",
-                'width_model = "vrchat_v1"',
-                "",
-                "[translation.chatbox_layout.widths]",
-                "cjk = 2.1",
-                "ascii_upper = 1.2",
-                "ascii_lower = 1.0",
-                "ascii_narrow = 0.5",
-                "fallback = 1.1",
                 "",
                 "[translation.providers.google_cloud]",
                 'project_id = "test-project"',
@@ -183,9 +171,6 @@ def test_load_app_config_parses_custom_values(tmp_path: Path) -> None:
     assert config.translation.provider == "google_cloud"
     assert config.translation.target_language == "en"
     assert config.translation.chatbox_layout.source_visible_lines == 3
-    assert config.translation.chatbox_layout.visual_line_width_units == 31.5
-    assert config.translation.chatbox_layout.widths.cjk == 2.1
-    assert config.translation.chatbox_layout.widths.ascii_narrow == 0.5
     assert config.translation.providers.google_cloud.project_id == "test-project"
 
 
@@ -323,12 +308,26 @@ def test_translation_config_rejects_chatbox_layout_that_exceeds_nine_lines() -> 
         )
 
 
-def test_translation_chatbox_layout_widths_require_positive_values() -> None:
+def test_translation_config_rejects_legacy_visual_width_keys(tmp_path: Path) -> None:
+    config_path = tmp_path / "legacy-width.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[translation.chatbox_layout]",
+                'mode = "stacked_two_zone"',
+                "source_visible_lines = 4",
+                "separator_blank_lines = 1",
+                "target_visible_lines = 4",
+                "visual_line_width_units = 29.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(
-        ValueError,
-        match="translation.chatbox_layout.widths.cjk must be >=",
+        ConfigError,
+        match="Unknown keys in translation.chatbox_layout: visual_line_width_units",
     ):
-        TranslationChatboxLayoutWidthsConfig(cjk=0.0)
+        AppConfig.from_toml_file(config_path)
 
 
 def test_google_cloud_translation_provider_config_defaults_location() -> None:

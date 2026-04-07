@@ -89,6 +89,7 @@ def write_test_config(
     iflytek_rtasr_overrides: Mapping[str, object] | None = None,
     openai_realtime_overrides: Mapping[str, object] | None = None,
     translation_overrides: Mapping[str, object] | None = None,
+    translation_chatbox_layout_overrides: Mapping[str, object] | None = None,
     google_cloud_translation_overrides: Mapping[str, object] | None = None,
 ) -> Path:
     capture_values: dict[str, object] = {
@@ -152,6 +153,12 @@ def write_test_config(
         "request_timeout_seconds": 3.0,
         "max_pending_finals": 8,
     }
+    translation_chatbox_layout_values: dict[str, object] = {
+        "mode": "stacked_two_zone",
+        "source_visible_lines": 4,
+        "separator_blank_lines": 1,
+        "target_visible_lines": 4,
+    }
     google_cloud_translation_values: dict[str, object] = {
         "location": "global",
     }
@@ -182,6 +189,7 @@ def write_test_config(
     iflytek_rtasr_values.update(iflytek_rtasr_overrides or {})
     openai_realtime_values.update(openai_realtime_overrides or {})
     translation_values.update(translation_overrides or {})
+    translation_chatbox_layout_values.update(translation_chatbox_layout_overrides or {})
     google_cloud_translation_values.update(google_cloud_translation_overrides or {})
 
     sections = [
@@ -196,6 +204,7 @@ def write_test_config(
         ("stt.providers.iflytek_rtasr", iflytek_rtasr_values),
         ("stt.providers.openai_realtime", openai_realtime_values),
         ("translation", translation_values),
+        ("translation.chatbox_layout", translation_chatbox_layout_values),
         (
             "translation.providers.google_cloud",
             google_cloud_translation_values,

@@ -1,146 +1,215 @@
-# VRChat Chatbox Width Investigation
+# VRChat Chatbox 报告
 
-This brief summarizes the current findings about VRChat chatbox visible capacity
-for Chinese and mixed-language text. It is meant to be shared with another AI or
-engineer for further analysis.
+## 1. 核心结论
 
-## Scope
+VRChat chatbox 应该被建模为一个**两层约束**系统：
 
-- Date of summary: `2026-04-01`
-- Context: `VRC Live Caption` currently sends chatbox text over OSC and clips
-  by character count only.
-- Goal: understand why pure Chinese text appears to show fewer visible
-  characters than mixed Chinese-English text.
+1. **发送层硬上限**：最多 `144` 个字符
+2. **显示层实际限制**：最多 `9` 行，且自动换行由**视觉宽度**决定
 
-## Confirmed Facts
+目前证据已经足够说明：
+问题的本质不是“字符数够不够”，而是“**比例宽度 + 自动换行**”是否先触发了 `9` 行显示上限。
 
-- VRChat official docs state:
-  - chatbox text is limited to `144` characters
-  - chatbox displays at most `9` lines
-  - automatic word wrap counts toward the `9` line limit
-- Current repo implementation clips merged chatbox text to the newest `144`
-  Python characters and does not estimate visual width or wrap.
-- Relevant repo files:
-  - `docs/official/VRC/OSC as Input Controller.md`
-  - `docs/development/architecture/caption-and-osc.md`
-  - `src/vrc_live_caption/chatbox.py`
+这也解释了为什么：
 
-## Problem Statement
+* 纯中文经常**达不到 144 个可见字符**
+* 混合英文时有时能显示更多
+* 不能用“中文=2，英文=1”这种简单规则解释全部现象
 
-- Pure Chinese text does not appear to use the full visible `144` characters in
-  VRChat chatbox.
-- Mixed English text can show more visible characters.
-- This suggests the practical display limit is driven by automatic wrapping and
-  character width, not only by the OSC transport limit.
+---
 
-## User Measurements
+## 2. 已确认的关键观测
 
-Manual testing produced these practical one-line capacities:
+当前最稳定、最有价值的数据是：
 
-- `15` repetitions of `U+4E2D` per line
-- `14` Chinese characters + `2` lowercase `x`
-- `13` Chinese characters + `4` lowercase `x`
-- `26` uppercase `X`
-- `29` lowercase `x`
+* `中`：**每行约 15 个**
 
-Derived observation:
+  * 纯 `中` 文本到 `9` 行时，实际可见总数约为 **135**
+* `x`：**每行约 29 个**
+* `X`：**每行约 26 个**
+* `i`：**每行约 60 个**
 
-- Pure Chinese text without punctuation is likely limited to about `9 * 15 =
-  135` visible characters before the `9`-line display cap is reached, even
-  though VRChat still accepts up to `144` characters.
+  * 已确认：`i×60` 不换行
+  * `i×61` 显示为 `60 + 1`
+  * `i×62` 显示为 `60 + 2`
+* `m`：**每行约 16 个**
+* `w`：**每行约 19 个**
+* `W`：**每行约 16 个**
+* `.` `,` `:`：**每行约 58 个**
+* `中，`：**每行约 7 组**
+* `中。`：**与 `中，` 表现一致**
 
-Additional screenshot-based observations:
+这些数据已经强力支持：
+**VRChat chatbox 使用的是比例宽度布局，而不是固定宽度布局。**
 
-- Lowercase `i` is much narrower than lowercase `x`
-- Uppercase `X` is wider than lowercase `x`
-- Mixed Chinese-English lines roughly follow an additive width model
-- Spaces and punctuation affect wrapping behavior and must be measured
+---
 
-## Working Interpretation
+## 3. 目前最重要的解释
 
-The current evidence fits a proportional-width line budget model better than a
-simple "Chinese counts as 2, English counts as 1" rule.
+### 3.1 “中文=2，英文=1” 这个模型不够用
 
-If lowercase `x` is treated as width `1.0`, a rough first-pass estimate is:
+它最多只能解释很粗糙的趋势，不能解释：
 
-- `U+4E2D ~= 29 / 15 ~= 1.93`
-- `X ~= 29 / 26 ~= 1.12`
+* `i` 明显比 `x` 窄很多
+* `m` / `W` 又明显比 `x` 宽
+* ASCII 标点比字母窄得多
+* 全角标点 `，` `。` 和 ASCII 标点的行为完全不是一类
 
-This suggests one visual line is approximately equal to the width of about `29`
-lowercase `x` characters.
+所以后续实现不应该继续往这个方向简化。
 
-## Recommended Modeling Direction
+### 3.2 全角标点更像“CJK 宽字符”，不是 ASCII 标点
 
-- Keep the hard transport limit at `<= 144` characters.
-- Add a second, visual-width-based safety layer that estimates wrap and tries to
-  stay within `<= 9` lines.
-- Continue using black-box testing inside VRChat as the primary source of truth.
-- Do not hardcode the final rule as:
-  - "all Chinese -> 135"
-  - "otherwise -> 144"
-- A short-term fallback could expose a configurable safe budget for CJK-heavy
-  text, but that should be treated as a temporary workaround.
+新测试表明：
 
-## Current Implementation Direction
+* `中，`
+* `中。`
 
-- `translation.output_mode = "source_target"` now uses the width-estimator path
-  as a configurable stacked two-zone layout:
-  - source paragraph
-  - blank separator line
-  - target paragraph
-- The runtime sends `source\n\ntarget` and lets VRChat handle auto-wrap.
-- `translation.chatbox_layout` exposes the current heuristic so it can be tuned
-  without code changes.
+这两类文本的行为一致，且每行大约只能放 **7 组**
 
-## Font File Question
+这说明：
 
-Finding the VRChat font file may help extract glyph advance widths, but it is
-not sufficient on its own because practical layout also depends on:
+* 全角 `，` `。` 不应与 `.` `,` `:` 归为同一类
+* 它们更接近 **中文宽度类**
+* 之前“全角逗号可能有额外神秘惩罚”的猜想，现在**不再是首选解释**
 
-- the real chatbox container width
-- possible fallback fonts for CJK glyphs
-- the final text rendering and wrapping behavior used by VRChat or Unity
+更自然的解释是：
 
-Conclusion:
+* 它们本身就是宽字符
+* 并且换行时没有观察到“标点出现在新行开头”的情况
 
-- font inspection is useful as a helper
-- in-client measurement is still required
+---
 
-## Highest-Value Next Tests
+## 4. 当前最合理的工作模型
 
-Measure one-line capacity for:
+目前最稳的解释是：
 
-- `i`, `l`, `1`
-- `m`, `w`, `M`, `W`
-- `0`, `8`
-- ASCII punctuation: `, . : ; - _`
-- full-width punctuation such as comma, period, exclamation mark, question
-  mark, colon, and parentheses
-- half-width space and full-width space
+### 第一层：字符本身有不同视觉宽度
 
-Measure mixed-pair behavior for:
+可以先按类别做粗分：
 
-- `U+4E2D + i`
-- `U+4E2D + m`
-- `U+4E2D + X`
-- `U+4E2D + 1`
-- `U+4E2D + full-width comma`
-- `U+4E2D + period`
+* CJK 汉字：如 `中`
+* 极窄拉丁：如 `i`
+* 普通拉丁小写：如 `x`
+* 宽拉丁小写：如 `m` `w`
+* 普通拉丁大写：如 `X`
+* 宽拉丁大写：如 `W`
+* ASCII 小标点：如 `.` `,` `:`
+* 全角标点：如 `，` `。`
 
-For every test, record:
+### 第二层：自动换行不是按字符数，而是按累计宽度
 
-- exact sent string
-- maximum visible characters per line
-- total visible characters before the chatbox hits `9` lines
-- whether the text used half-width or full-width punctuation or spaces
+也就是说，真正的限制更接近：
 
-## Summary For Another AI
+* 先检查 `<= 144` 字符
+* 再按估计宽度模拟换行
+* 只要预测会超过 `9` 行，就继续裁剪
 
-Please analyze VRChat chatbox layout as a two-layer constraint problem:
+---
 
-1. Hard send limit: `144` characters
-2. Practical display limit: `9` wrapped lines with proportional character widths
+## 5. 当前唯一还没钉死的问题
 
-Current evidence strongly suggests the implementation should move from pure
-character-count clipping to a visual-width estimator calibrated by VRChat
-black-box tests.
+### `中m` 混排仍然存在一个未解点
+
+现在这组数据里，`中m` 是最需要谨慎对待的部分。
+
+已知现象是：
+
+* `中m` 重复 8 组可以不换行
+* 加一个额外字符后，换行位置看起来**不完全符合简单的线性加法模型**
+* 这意味着两种可能性至少有一种成立：
+
+  1. 这组样本里还有一次需要复核的记录
+  2. CJK 与拉丁字母的边界处，存在额外的换行规则
+
+所以现阶段最稳妥的做法是：
+
+* **不要用 `中m` 这一组直接定最终参数**
+* 把它当成当前唯一的重要待确认项
+
+---
+
+## 6. 对工程实现的直接意义
+
+这项研究已经足够支持代码方向调整：
+
+### 当前做法
+
+只按字符数裁剪到 `144`
+
+### 建议做法
+
+改成两段式：
+
+1. **硬限制**：`len(text) <= 144`
+2. **显示安全限制**：按字符类别估计宽度，模拟自动换行，目标保持在 `<= 9` 行以内，并留少量安全余量
+
+这意味着：
+
+* 不能再只做“最后 144 个字符截断”
+* 也不应该写成“纯中文就 135，否则 144”这种二元规则
+* 更合适的是“**类别宽度估计 + 换行模拟**”
+
+---
+
+## 7. 下一步最值得做的动作
+
+后续工作已经很集中，不需要大范围盲测了。优先级最高的是：
+
+### 7.1 复核 `中m`
+
+目标是确认：
+问题到底是“样本误差”，还是“混排边界真的有额外规则”。
+
+### 7.2 补几个代表性混排对
+
+优先测这些：
+
+* `中X`
+* `中W`
+* `中1`
+* `中0`
+
+这几组能快速判断：
+
+* 混排异常是不是只出现在某些字母
+* 是“宽度问题”还是“脚本边界问题”
+
+### 7.3 把全角标点类补完整
+
+建议补：
+
+* `！`
+* `？`
+* `：`
+* `（`
+* `）`
+
+目标是确认：
+全角标点是不是都可以归入同一个“CJK 宽标点类”。
+
+### 7.4 单独测空格
+
+已有迹象说明：
+
+* 空格会影响断行
+* 某些情况下空格可能在换行点不作为可见字符保留
+
+但这一点还值得专门做一轮确认。
+
+---
+
+## 8. 结论
+
+到目前为止，最重要的结论已经明确：
+
+**VRChat chatbox 的真实可见容量，不是由 144 字符单独决定，而是由 `144 字符发送上限 + 9 行比例宽度换行` 共同决定。**
+
+这也是为什么：
+
+* 纯中文通常只能稳定显示到约 **135**
+* 窄字符如 `i` 可以远超中文的单行容量
+* 全角标点应当按 **CJK 宽字符** 看待，而不是按 ASCII 标点处理
+
+因此，后续研究的重点已经不是“证明现象是否存在”，而是：
+
+**把宽度分类和换行规则校准到足够稳定，然后落到一个保守、可配置的裁剪器里。**

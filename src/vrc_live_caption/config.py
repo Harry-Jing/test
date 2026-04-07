@@ -23,7 +23,6 @@ _SUPPORTED_TRANSLATION_PROVIDERS = {"deepl", "google_cloud"}
 _SUPPORTED_TRANSLATION_OUTPUT_MODES = {"source", "target", "source_target"}
 _SUPPORTED_TRANSLATION_STRATEGIES = {"final_only"}
 _SUPPORTED_TRANSLATION_CHATBOX_LAYOUT_MODES = {"stacked_two_zone"}
-_SUPPORTED_TRANSLATION_CHATBOX_WIDTH_MODELS = {"vrchat_v1"}
 
 
 def _coerce_int(value: Any, context: str, *, minimum: int | None = None) -> int:
@@ -535,46 +534,13 @@ class GoogleCloudTranslationProviderConfig(_ConfigModel):
         return _coerce_str(value, "translation.providers.google_cloud.location")
 
 
-class TranslationChatboxLayoutWidthsConfig(_ConfigModel):
-    """Store heuristic visual-width weights for VRChat chatbox estimation."""
-
-    cjk: float = 1.93
-    ascii_upper: float = 1.12
-    ascii_lower: float = 1.0
-    ascii_narrow: float = 0.6
-    fallback: float = 1.0
-
-    @field_validator(
-        "cjk",
-        "ascii_upper",
-        "ascii_lower",
-        "ascii_narrow",
-        "fallback",
-        mode="before",
-    )
-    @classmethod
-    def _validate_float_fields(cls, value: Any, info: ValidationInfo) -> float:
-        field_name = info.field_name
-        assert field_name is not None
-        return _coerce_float(
-            value,
-            f"translation.chatbox_layout.widths.{field_name}",
-            minimum=0.1,
-        )
-
-
 class TranslationChatboxLayoutConfig(_ConfigModel):
-    """Store source-target stacked chatbox layout heuristics and budgets."""
+    """Store source-target stacked chatbox layout line budgets."""
 
     mode: str = "stacked_two_zone"
     source_visible_lines: int = 4
     separator_blank_lines: int = 1
     target_visible_lines: int = 4
-    visual_line_width_units: float = 29.0
-    width_model: str = "vrchat_v1"
-    widths: TranslationChatboxLayoutWidthsConfig = Field(
-        default_factory=TranslationChatboxLayoutWidthsConfig
-    )
 
     @field_validator("mode", mode="before")
     @classmethod
@@ -604,24 +570,6 @@ class TranslationChatboxLayoutConfig(_ConfigModel):
             value,
             f"translation.chatbox_layout.{field_name}",
             minimum=minimums[field_name],
-        )
-
-    @field_validator("visual_line_width_units", mode="before")
-    @classmethod
-    def _validate_visual_line_width_units(cls, value: Any) -> float:
-        return _coerce_float(
-            value,
-            "translation.chatbox_layout.visual_line_width_units",
-            minimum=0.1,
-        )
-
-    @field_validator("width_model", mode="before")
-    @classmethod
-    def _validate_width_model(cls, value: Any) -> str:
-        return _coerce_choice_str(
-            value,
-            "translation.chatbox_layout.width_model",
-            allowed=_SUPPORTED_TRANSLATION_CHATBOX_WIDTH_MODELS,
         )
 
     @model_validator(mode="after")
@@ -808,7 +756,6 @@ __all__ = [
     "SttProvidersConfig",
     "SttRetryConfig",
     "TranslationChatboxLayoutConfig",
-    "TranslationChatboxLayoutWidthsConfig",
     "TranslationConfig",
     "TranslationProvidersConfig",
     "parse_device_value",

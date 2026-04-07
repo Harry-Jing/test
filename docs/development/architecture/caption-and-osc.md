@@ -21,7 +21,7 @@ It originated in M3 and remains the source of truth for VRChat-facing text behav
 
 - VRChat chatbox text is limited to `144` characters
 - VRChat displays at most `9` lines, counting both explicit newlines and automatic wrapping
-- This document does not try to predict VRChat word wrap; it only controls explicit newlines and character budgets
+- Chatbox layout now uses the fixed VRChat TMP model from the final report: `280px` usable width, `fontSize = 18`, `NotoSans-Regular`, `NotoSansCJK-JP-Regular`, and TMP leading/following line-break tables
 - pacing tolerance beyond the documented text and line limits is treated as an empirical behavior that may need further tuning
 
 ## Stabilization And Layout
@@ -31,16 +31,17 @@ It originated in M3 and remains the source of truth for VRChat-facing text behav
 - the active utterance keeps a monotonic stable prefix based on the longest common prefix between consecutive revisions
 - when a new utterance arrives before the previous utterance is final, the previous utterance commits only its current stable prefix and drops the unstable tail
 - final events commit the full final text and clear the active utterance
-- output uses a single-line rolling layout:
-  - committed history stays on the left
-  - the active utterance continues on the right in the same line
-- This document does not emit explicit newlines for layout control
-- the merged chatbox text is clipped from the left to stay within `144` characters, preserving the newest tail of the line
+- output keeps VRChat auto-wrap in control inside each visible zone; it does not insert manual in-zone newlines
+- visible history is sentence-aware:
+  - finalized history is segmented by primary sentence terminators such as `。！？.!?`
+  - if the next oldest whole sentence does not fit the visible zone, that sentence is dropped entirely
+  - if one sentence alone exceeds the zone budget, the renderer keeps the sentence tail and prefers a legal TMP/UAX break before hard clipping
 - when translated output is enabled:
   - pending translated finals stay source-only until translation completes
-  - `target` mode replaces finalized entries with translated text once translation completes
-  - `source_target` mode renders `source_paragraph\n\ntarget_paragraph`
-  - `source_target` uses a stacked two-zone heuristic: source and target are clipped independently by visual-width estimates, the blank separator line is explicit, and the final OSC payload still stays within `144` characters
+  - `source` mode renders one single top zone using `translation.chatbox_layout.source_visible_lines`
+  - `target` mode also renders one single top zone and uses translated finals when they are available, while active partial preview stays source-language
+  - `source_target` mode always reserves a strict `source_visible_lines + separator_blank_lines + target_visible_lines` layout and renders `source_paragraph\n\ntarget_paragraph`
+  - `source_target` clips source and target independently with the shared font/TMP wrap simulator first, then applies the final `144`-character cap as a safety guard while allowing unused character budget to flow to the other side
 
 ## Pacing And CLI Behavior
 
