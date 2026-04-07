@@ -18,5 +18,4 @@ Development documents for `VRC Live Caption`.
 
 ## Plans
 
-- [Testing Refactor](./plans/testing-refactor.md): current direction for reorganizing and simplifying the test suite
-- [UI Remaining](./plans/ui-remaining.md): minimal remaining GUI wrapper work
+- [UI](./plans/UI.md): minimal remaining GUI wrapper work
