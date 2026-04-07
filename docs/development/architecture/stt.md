@@ -1,11 +1,12 @@
 # STT
 
-This document records the current STT contract after the asyncio pipeline refactor.
+This document records the current STT contract.
 
 ## Scope
 
 - This document covers backend selection, session runner lifecycle, retry behavior, connection-attempt boundaries, and normalized events.
 - Capture ownership and CLI composition live in `architecture/runtime.md`.
+- STT remains a dedicated layer between runtime audio and provider transport; provider auth, transport, pacing, and normalization stay inside `stt` rather than `audio` or `runtime`.
 
 ## Top-Level Model
 
@@ -55,10 +56,12 @@ This document records the current STT contract after the asyncio pipeline refact
 ### OpenAI Realtime
 
 - `OpenAIRealtimeBackend` validates capture shape for mono `int16` audio.
+- Each attempt initializes transcription mode with `session.update` and does not publish `ready` before the provider acknowledges the session configuration.
 - Each attempt creates a fresh `OpenAIConnectionState`.
 - Attempt-scoped state includes:
   - utterance map
   - PCM16 resampler
+- The backend resamples internally to `24000 Hz` mono `pcm16` before sending audio.
 
 ### iFLYTEK RTASR
 
@@ -70,6 +73,7 @@ This document records the current STT contract after the asyncio pipeline refact
   - session id
   - paced-send timing fields
   - end-of-stream flags
+- Provider-specific authentication, paced chunk sending, and the final end-of-stream close message stay inside the backend.
 
 ### FunASR Local Sidecar
 

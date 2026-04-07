@@ -58,6 +58,12 @@ This document records the current runtime contract for the async capture-to-capt
 - The first `Ctrl+C` immediately prints a CLI hint that shutdown has started and that a second `Ctrl+C` will force exit.
 - A second `Ctrl+C` while shutdown is already in progress aborts the wait immediately and falls back to hard process exit.
 
+## Application Boundary
+
+- The main application owns capture, runtime orchestration, caption flow, translation flow, and VRChat output composition.
+- Local model inference details stay behind provider or sidecar boundaries rather than moving into runtime internals.
+- The GUI, when present, wraps the same config, logging, diagnostics, and runtime controls; it does not replace the core pipeline contract.
+
 ## Internal Package Boundaries
 
 - `vrc_live_caption.audio` owns device discovery, backend protocols, and the `sounddevice` adapter.

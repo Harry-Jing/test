@@ -1,7 +1,7 @@
 # Caption And OSC
 
 This document records the current caption stabilization and OSC output contract.
-It originated in M3 and remains the source of truth for VRChat-facing text behavior.
+It remains the source of truth for VRChat-facing text behavior.
 
 ## Scope
 
@@ -21,7 +21,8 @@ It originated in M3 and remains the source of truth for VRChat-facing text behav
 
 - VRChat chatbox text is limited to `144` characters
 - VRChat displays at most `9` lines, counting both explicit newlines and automatic wrapping
-- Chatbox layout now uses the fixed VRChat TMP model from the final report: `280px` usable width, `fontSize = 18`, `NotoSans-Regular`, `NotoSansCJK-JP-Regular`, and TMP leading/following line-break tables
+- Chatbox layout uses the fixed VRChat TMP model documented in `architecture/vrchat-chatbox-reference.md`: `280px` usable width, `fontSize = 18`, `NotoSans-Regular`, `NotoSansCJK-JP-Regular`, and TMP leading/following line-break tables
+- `architecture/vrchat-chatbox-reference.md` is the canonical chatbox-wrap reference; `architecture/VRChat_ChatBox_Final_Report.md` remains the archival reverse-engineering record
 - pacing tolerance beyond the documented text and line limits is treated as an empirical behavior that may need further tuning
 
 ## Stabilization And Layout

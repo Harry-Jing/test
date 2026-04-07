@@ -1,6 +1,6 @@
 # Translation
 
-This document records the current translation-layer contract introduced in M6.
+This document records the current translation-layer contract.
 
 ## Scope
 
@@ -56,7 +56,7 @@ target paragraph
   - whole sentences are preferred over partial tails
   - primary sentence terminators are `。！？.!?`
   - one sentence alone may be clipped only after the renderer fails to keep it whole, and the clipped result preserves the sentence tail
-- Wrap simulation is driven by the fixed VRChat TMP/font model from `docs/development/plans/VRChat_ChatBox_Final_Report.md`, not by a configurable heuristic width model.
+- Wrap simulation is driven by the fixed VRChat TMP/font model from `docs/development/architecture/vrchat-chatbox-reference.md`, not by a configurable heuristic width model.
 - The renderer first decides the source-only tail and the aligned translated pairs by the real wrap simulator, then applies the final `144`-character hard limit:
   - source-only tail characters and the separator are reserved first
   - the remaining character budget is shared only by the aligned translated pairs, with unused budget still allowed to flow to the other side
