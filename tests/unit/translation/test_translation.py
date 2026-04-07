@@ -210,6 +210,41 @@ def test_async_translation_worker_drops_oldest_pending_requests() -> None:
     asyncio.run(scenario())
 
 
+def test_async_translation_worker_shutdown_cancel_not_counted_as_failure() -> None:
+    async def scenario() -> None:
+        backend = _SlowBackend()
+        failed: list[tuple[str, type]] = []
+        worker = AsyncTranslationWorker(
+            backend=backend,
+            request_timeout_seconds=5.0,
+            max_pending_requests=2,
+            logger=logging.getLogger("test.translation.cancel"),
+            on_result=lambda result: True,
+            on_failure=lambda request, exc: (
+                failed.append((request.utterance_id, type(exc))) or True
+            ),
+        )
+
+        await worker.start()
+        worker.submit(
+            TranslationRequest(
+                utterance_id="utt-cancel",
+                revision=1,
+                text="cancel me",
+                target_language="en",
+            )
+        )
+        await asyncio.sleep(0.02)
+        await worker.shutdown(timeout_seconds=0.05)
+
+        assert failed == [], f"on_failure should not be called on cancel, got {failed}"
+        metrics = worker.metrics()
+        assert metrics.failed_requests == 0
+        assert metrics.stale_results == 0
+
+    asyncio.run(scenario())
+
+
 def test_async_translation_worker_reports_timeouts_as_failures() -> None:
     async def scenario() -> None:
         backend = _SlowBackend()

@@ -132,7 +132,9 @@ class AsyncTranslationWorker:
                 self._backend.translate(request),
                 timeout=self._request_timeout_seconds,
             )
-        except BaseException as exc:
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
             self._failed_requests += 1
             if not self._on_failure(request, exc):
                 self._stale_results += 1
