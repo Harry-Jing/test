@@ -1,7 +1,5 @@
 """Normalize, merge, and segment chatbox text."""
 
-from __future__ import annotations
-
 from functools import lru_cache
 
 from .model import (

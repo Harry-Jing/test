@@ -1,7 +1,5 @@
 """Run the repository-local TranslateGemma websocket sidecar."""
 
-from __future__ import annotations
-
 import asyncio
 import importlib
 import logging

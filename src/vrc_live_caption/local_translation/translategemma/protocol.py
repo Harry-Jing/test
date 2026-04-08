@@ -1,7 +1,5 @@
 """Define the websocket protocol for the local TranslateGemma sidecar."""
 
-from __future__ import annotations
-
 import json
 from typing import Any
 

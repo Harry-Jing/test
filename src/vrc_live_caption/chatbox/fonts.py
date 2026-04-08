@@ -1,7 +1,5 @@
 """Load bundled fonts and expose cached shaping helpers."""
 
-from __future__ import annotations
-
 import io
 import unicodedata
 from bisect import bisect_right

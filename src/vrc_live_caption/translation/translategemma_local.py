@@ -1,7 +1,5 @@
 """Implement the websocket-backed local TranslateGemma translation backend."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import ssl

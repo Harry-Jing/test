@@ -1,7 +1,5 @@
 """Run the repository-local FunASR websocket sidecar."""
 
-from __future__ import annotations
-
 import importlib
 import logging
 from collections.abc import Callable
