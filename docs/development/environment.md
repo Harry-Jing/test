@@ -17,26 +17,15 @@ uv sync
 
 This creates or updates the project environment from `pyproject.toml` and `uv.lock`.
 
-For the local FunASR sidecar, choose one extra before manual validation:
+For local inference, choose one shared extra before manual validation:
 
 ```bash
-uv sync --extra funasr-cpu
-uv sync --extra funasr-cu128
+uv sync --extra local-cpu
+uv sync --extra local-cu128
 ```
 
-- Use `funasr-cpu` for CPU-only validation.
-- Use `funasr-cu128` on Windows with an NVIDIA GPU when you want the local sidecar to resolve `device = "auto"` to `cuda:0`.
-
-For the local TranslateGemma translation sidecar, choose one extra before manual validation:
-
-```bash
-uv sync --extra translategemma-cpu
-uv sync --extra translategemma-cu128
-```
-
-- Use `translategemma-cpu` for CPU-only validation.
-- Use `translategemma-cu128` on Windows with an NVIDIA GPU when you want the local sidecar to resolve `device = "auto"` to `cuda:0` and `dtype = "auto"` to `bfloat16`.
-- If you install both local STT and local TranslateGemma extras together, keep them on the same acceleration track: CPU + CPU or CUDA + CUDA.
+- Use `local-cpu` for CPU-only local STT and local TranslateGemma validation.
+- Use `local-cu128` on Windows with an NVIDIA GPU when you want local inference to resolve `device = "auto"` to `cuda:0` and TranslateGemma `dtype = "auto"` to `bfloat16`.
 
 ## Secrets And Config
 

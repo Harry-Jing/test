@@ -130,8 +130,7 @@ uv run vrc-live-caption run
 - `osc-test` does not require STT credentials.
 - `local-stt serve` reads the main app config file and uses `[stt.providers.funasr_local]` plus `[stt.providers.funasr_local.sidecar]`.
 - `local-translation serve` reads the main app config file and uses `[translation.providers.translategemma_local]` plus `[translation.providers.translategemma_local.sidecar]`.
-- Install `uv sync --extra funasr-cpu` for CPU-only local STT validation, or `uv sync --extra funasr-cu128` on Windows/NVIDIA machines for GPU validation.
-- Install `uv sync --extra translategemma-cpu` for CPU-only local translation validation, or `uv sync --extra translategemma-cu128` on Windows/NVIDIA machines for GPU validation.
+- Install `uv sync --extra local-cpu` for CPU-only local validation, or `uv sync --extra local-cu128` on Windows/NVIDIA machines for GPU validation.
 - `[stt.providers.funasr_local.sidecar].device = "auto"` prefers `cuda:0` when `torch.cuda.is_available()` is true and otherwise falls back to `cpu`.
 - `[translation.providers.translategemma_local.sidecar].device = "auto"` and `dtype = "auto"` resolve to `cuda:0` plus `bfloat16` when `torch.cuda.is_available()` is true and otherwise fall back to `cpu` plus `float32`.
 

@@ -19,6 +19,19 @@ uv run vrc-live-caption doctor
 uv run vrc-live-caption run
 ```
 
+## Local Dependency Install
+
+When you want any local inference feature, install one shared local extra first:
+
+```bash
+uv sync --extra local-cpu
+# or
+uv sync --extra local-cu128
+```
+
+- Use `local-cpu` for CPU-only local STT and/or local translation.
+- Use `local-cu128` on Windows/NVIDIA machines when you want local inference to resolve `device = "auto"` to `cuda:0`.
+
 ## OpenAI Default
 
 Use this when you want the default cloud STT path and do not need translation yet.
@@ -76,13 +89,7 @@ Common errors:
 
 Use this when you want local STT instead of a cloud provider.
 
-Install one local STT extra first:
-
-```bash
-uv sync --extra funasr-cpu
-# or
-uv sync --extra funasr-cu128
-```
+Install the shared local extra first. See `Local Dependency Install` above.
 
 `vrc-live-caption.toml`:
 
@@ -113,8 +120,8 @@ uv run vrc-live-caption run
 
 Common errors:
 
-- `FunASR dependencies are not installed`: install `funasr-cpu` or `funasr-cu128`.
-- `device = "cuda"` but CUDA is unavailable: either switch `[stt.providers.funasr_local.sidecar].device` to `cpu` or install the CUDA extra on a Windows/NVIDIA machine.
+- `FunASR dependencies are not installed`: install `local-cpu` or `local-cu128`.
+- `device = "cuda"` but CUDA is unavailable: either switch `[stt.providers.funasr_local.sidecar].device` to `cpu` or install `local-cu128` on a Windows/NVIDIA machine.
 - `local STT sidecar unreachable`: start `uv run vrc-live-caption local-stt serve` and make sure host and port match `[stt.providers.funasr_local]`.
 
 ## DeepL Translation
@@ -173,13 +180,7 @@ Common errors:
 
 Use this when you want local text translation.
 
-Install one local translation extra first:
-
-```bash
-uv sync --extra translategemma-cpu
-# or
-uv sync --extra translategemma-cu128
-```
+Install the shared local extra first. See `Local Dependency Install` above.
 
 `vrc-live-caption.toml`:
 
@@ -219,7 +220,7 @@ Environment prerequisites:
 Common errors:
 
 - `translation.source_language is required`: set `[translation].source_language`.
-- `TranslateGemma dependencies are not installed`: install `translategemma-cpu` or `translategemma-cu128`.
+- `TranslateGemma dependencies are not installed`: install `local-cpu` or `local-cu128`.
 - `local translation sidecar unreachable`: start `uv run vrc-live-caption local-translation serve` and make sure host and port match `[translation.providers.translategemma_local]`.
 - Model download or gated access failures: accept the license and authenticate with Hugging Face before starting the sidecar.
 

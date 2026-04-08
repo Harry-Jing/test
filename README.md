@@ -34,6 +34,10 @@ Set `OPENAI_API_KEY` in `.env` before `doctor` or `run`.
 
 Ordinary configuration lives in one file: `vrc-live-caption.toml`. See [docs/configuration.md](./docs/configuration.md) for scenario-based setup, including local FunASR and local TranslateGemma sidecars.
 
+For local inference dependencies, use one shared extra:
+- CPU: `uv sync --extra local-cpu`
+- CUDA 12.8: `uv sync --extra local-cu128`
+
 ## Common Commands
 
 ```shell

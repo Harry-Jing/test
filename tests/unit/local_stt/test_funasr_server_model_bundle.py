@@ -29,7 +29,7 @@ class TestAutoModelFunasrBundleLoad:
 
         with pytest.raises(
             SttSessionError,
-            match="FunASR dependencies are not installed",
+            match="Install the local-cpu or local-cu128 extra",
         ):
             AutoModelFunasrBundle.load(
                 config=FunasrLocalServiceConfig(),

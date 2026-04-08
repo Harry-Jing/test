@@ -53,7 +53,7 @@ class TestResolveFunasrRuntimeDevice:
     def test_when_cuda_policy_is_requested_without_cuda__then_it_raises_stt_session_error(
         self,
     ) -> None:
-        with pytest.raises(SttSessionError, match="funasr-cu128 extra"):
+        with pytest.raises(SttSessionError, match="local-cu128 extra"):
             resolve_funasr_runtime_device(
                 device_policy="cuda",
                 torch_module=make_torch(cuda_available=False),
