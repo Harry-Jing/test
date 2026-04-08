@@ -2,12 +2,13 @@
 
 import asyncio
 import logging
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from . import __version__
 from .audio import AudioBackendError, AudioDeviceInfo, SoundDeviceBackend
 from .chatbox import ChatboxOutput
 from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
@@ -161,7 +162,12 @@ LocalTranslationPortOption = Annotated[
 def _show_version(value: bool) -> None:
     if not value:
         return
-    typer.echo(__version__)
+    try:
+        typer.echo(package_version("vrc-live-caption"))
+    except PackageNotFoundError:
+        _exit_with_error(
+            "Package metadata not found; install the project before using --version."
+        )
     raise typer.Exit()
 
 

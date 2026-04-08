@@ -5,6 +5,7 @@ Development documents for `VRC Live Caption`.
 ## Core references
 
 - [Environment](./environment.md): setup, secrets, dependency policy, and key stack defaults
+- [Release Automation](./release-automation.md): release-please workflow, bootstrap baseline, and required repository settings
 - [Testing](./testing.md): default checks, opt-in integration runs, coverage inspection, and manual validation
 - [Docstrings](./docstrings.md): concise docstring rules for public APIs
 

@@ -35,14 +35,14 @@ repos:
         entry: |-
           (?x)\A
           # commit type
-          (feat|fix|docs|refactor|perf|test|build|ci|chore|revert)
+          (build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)
           # optional scope
           (\([^()\r\n]+\))?
           # optional breaking marker and separator
           !?:
           [ ]
           # required emoji
-          (✨|🐛|📝|♻️|⚡️|✅|📦|👷|🔧|⏪️|💥)
+          (?:📦️?|🔧|👷|📝|✨|🐛|⚡️?|♻️?|⏪️?|🎨|✅|💥)
           [ ]
           # required subject
           [^\r\n]+

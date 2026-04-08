@@ -5,6 +5,7 @@ Minimal contributor workflow for `VRC Live Caption`.
 ## Read First
 
 - [Environment](./docs/development/environment.md)
+- [Release Automation](./docs/development/release-automation.md)
 - [Testing](./docs/development/testing.md)
 - [Docstrings](./docs/development/docstrings.md)
 
@@ -27,7 +28,7 @@ uv run ty check
 
 ## Commit Messages
 
-Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) and add an emoji after `: `.
+Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) with the same type list as [`@commitlint/config-conventional`](https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional), and add a matching [gitmoji](https://gitmoji.dev/) after `: `.
 
 ```text
 <type>[optional scope][!]: <emoji> <description>
@@ -35,23 +36,39 @@ Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
 
 Types:
 
-- `feat`: ✨
-- `fix`: 🐛
-- `docs`: 📝
-- `refactor`: ♻️
-- `perf`: ⚡️
-- `test`: ✅
-- `build`: 📦
-- `ci`: 👷
-- `chore`: 🔧
-- `revert`: ⏪️
+- `build`: 📦️ build system, packaging, compiled assets, or dependency packaging changes
+- `chore`: 🔧 maintenance, repo housekeeping, or non-user-facing config/script upkeep
+- `ci`: 👷 CI workflow and automation changes
+- `docs`: 📝 documentation changes
+- `feat`: ✨ user-facing features
+- `fix`: 🐛 bug fixes
+- `perf`: ⚡️ performance improvements
+- `refactor`: ♻️ refactors without behavior changes
+- `revert`: ⏪️ revert previous changes
+- `style`: 🎨 formatting and style-only changes
+- `test`: ✅ tests and test harness changes
+
+Notes:
+
+- Use `!` for breaking changes, for example `feat(api)!: 💥 remove legacy auth`.
+- Keep the emoji aligned with the intent of the type. The list above is the repository's recommended type-to-gitmoji pairing.
 
 Example commit messages:
+
 ```text
-feat(api): ✨ add batch endpoint
+feat(chatbox): ✨ add source-target layout mode
 fix(config): 🐛 handle missing .env file
+ci(release): 👷 add release-please workflow
+style(cli): 🎨 normalize help text wrapping
 feat(api)!: 💥 remove legacy auth
 ```
+
+Release automation notes:
+
+- `main` uses `release-please` to manage release PRs, versions, tags, and GitHub Releases.
+- Before the first release, `.release-please-manifest.json` is intentionally empty.
+- `release-please-config.json` uses the same commit type list for changelog sections, with gitmoji section titles.
+- Release Please changelog presentation is broader than release triggering. For Python projects, release PR creation still mainly depends on releasable types such as `feat`, `fix`, and `docs`.
 
 ## Pull Requests
 

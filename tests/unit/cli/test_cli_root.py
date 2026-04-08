@@ -1,8 +1,8 @@
 import importlib
 import runpy
 import sys
+from importlib.metadata import version as package_version
 
-from vrc_live_caption import __version__
 from vrc_live_caption.cli import app
 
 
@@ -35,7 +35,7 @@ class TestCliRootHelp:
         result = cli_runner.invoke(app, ["--version"])
 
         assert result.exit_code == 0
-        assert result.output.strip() == __version__
+        assert result.output.strip() == package_version("vrc-live-caption")
 
 
 class TestCliMainModuleEntryPoint:
