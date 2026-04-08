@@ -32,7 +32,7 @@ uv run vrc-live-caption run
 
 Set `OPENAI_API_KEY` in `.env` before `doctor` or `run`.
 
-Ordinary configuration lives in one file: `vrc-live-caption.toml`. See [docs/configuration.md](./docs/configuration.md) for scenario-based setup, including local FunASR and local TranslateGemma sidecars.
+Ordinary configuration lives in one file: `vrc-live-caption.toml`. See the inline notes in [vrc-live-caption.toml.example](./vrc-live-caption.toml.example) for setup hints, including local FunASR and local TranslateGemma sidecars.
 
 For local inference dependencies, use one shared extra:
 - CPU: `uv sync --extra local-cpu`
@@ -50,4 +50,4 @@ uv run vrc-live-caption record-sample --seconds 10
 uv run vrc-live-caption run
 ```
 
-OpenAI is the default backend. To use iFLYTEK, FunASR, DeepL, Google Cloud, or TranslateGemma instead, keep using the same `vrc-live-caption.toml` file and follow [docs/configuration.md](./docs/configuration.md).
+OpenAI is the default backend. To use iFLYTEK, FunASR, DeepL, Google Cloud, or TranslateGemma instead, keep using the same `vrc-live-caption.toml` file and follow the inline notes in [vrc-live-caption.toml.example](./vrc-live-caption.toml.example).

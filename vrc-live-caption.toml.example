@@ -1,17 +1,19 @@
 # VRC Live Caption configuration
 #
-# This is the only ordinary config file.
-# Secrets stay in `.env`.
+# Ordinary runtime config lives in `vrc-live-caption.toml`.
+# Secrets live in `.env`.
 #
-# Start here:
-# 1. Copy this file to `vrc-live-caption.toml`
-# 2. Put required secrets in `.env`
-# 3. Run `uv run vrc-live-caption doctor`
+# First run:
+# 1. Copy `.env.example` to `.env`
+# 2. Copy this file to `vrc-live-caption.toml`
+# 3. Set `OPENAI_API_KEY` in `.env`
+# 4. Run `uv sync`
+# 5. Run `uv run vrc-live-caption doctor`
+# 6. Run `uv run vrc-live-caption run`
 #
-# Minimal setup:
-# - Captions only with OpenAI STT: leave most values as-is and set `OPENAI_API_KEY`
-# - Translation: set `[translation].enabled = true`, choose a provider, and set `target_language`
-# - Local FunASR / TranslateGemma: keep using this same file; edit the `.sidecar` blocks below
+# For local STT or local translation, install one shared extra first:
+# - CPU: `uv sync --extra local-cpu`
+# - CUDA 13.0: `uv sync --extra local-cu130`
 
 [capture]
 # Usually you do not need to change this block.
@@ -51,6 +53,8 @@ notification_sfx = false
 [stt]
 # Choose one: `openai_realtime`, `iflytek_rtasr`, or `funasr_local`.
 # OpenAI is the default and only needs `OPENAI_API_KEY` in `.env`.
+# `iflytek_rtasr` needs `IFLYTEK_APP_ID`, `IFLYTEK_API_KEY`, and `IFLYTEK_API_SECRET`.
+# `funasr_local` requires `uv run vrc-live-caption local-stt serve` first.
 provider = "openai_realtime"
 
 [stt.retry]
@@ -102,8 +106,11 @@ log_path = ".runtime/logs/local-stt-funasr.log"
 
 [translation]
 # Turn translation on only when you want bilingual or translated output.
+# When enabled, set `target_language` and choose a provider below.
 enabled = false
 # Choose one: `deepl`, `google_cloud`, or `translategemma_local`.
+# `deepl` needs `DEEPL_AUTH_KEY`; `google_cloud` needs ADC plus `project_id`.
+# `translategemma_local` needs a local extra and `uv run vrc-live-caption local-translation serve`.
 provider = "deepl"
 target_language = "en"
 # Required when `translation.provider = "translategemma_local"`.

@@ -41,7 +41,7 @@ uv sync --extra local-cu130
 - Use `.env` for secrets only.
 - Ordinary runtime configuration comes from `vrc-live-caption.toml`.
 - Local FunASR and local TranslateGemma sidecar runtime settings are nested inside that same file under `[stt.providers.funasr_local.sidecar]` and `[translation.providers.translategemma_local.sidecar]`.
-- `docs/configuration.md` is the user-facing setup reference.
+- `vrc-live-caption.toml.example` is the user-facing setup reference.
 
 ## Dependency Changes
 
