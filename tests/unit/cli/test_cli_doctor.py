@@ -50,6 +50,7 @@ class TestDoctorCommand:
         assert "[ok] stream probe succeeded" in result.output
         assert "[ok] osc target configured: 127.0.0.1:9000" in result.output
         assert "[ok] required STT secrets found" in result.output
+        assert "[ok] translation disabled" in result.output
 
     def test_when_iflytek_secrets_are_missing__then_it_exits_non_zero(
         self,
@@ -198,7 +199,7 @@ class TestDoctorCommand:
         )
 
         assert result.exit_code == 0
-        assert "[ok] stt backend configured: openai_realtime" in result.output
+        assert "STT backend: openai_realtime" in result.output
 
     def test_when_local_funasr_backend_is_selected__then_it_skips_secret_validation(
         self,
@@ -237,8 +238,11 @@ class TestDoctorCommand:
         result = cli_runner.invoke(app, ["doctor", "--config", str(config_path)])
 
         assert result.exit_code == 0
-        assert "[ok] stt backend configured: funasr_local" in result.output
-        assert "[ok] local STT sidecar reachable: cuda:0 (policy=auto)" in result.output
+        assert "STT backend: funasr_local (127.0.0.1:10095)" in result.output
+        assert (
+            "[ok] local STT sidecar reachable: "
+            "endpoint=ws://127.0.0.1:10095, device=cuda:0, policy=auto" in result.output
+        )
 
     def test_when_osc_configuration_fails__then_it_exits_non_zero(
         self,
@@ -300,7 +304,11 @@ class TestDoctorCommand:
         )
 
         assert result.exit_code == 0
-        assert "[ok] translation configured: deepl -> en" in result.output
+        assert (
+            "Translation: deepl -> en (mode=source_target, strategy=final_only)"
+            in result.output
+        )
+        assert "[ok] translation runtime validated" in result.output
 
     def test_when_local_translategemma_translation_is_enabled__then_it_probes_sidecar(
         self,
@@ -352,12 +360,11 @@ class TestDoctorCommand:
         assert result.exit_code == 0
         assert (
             "[ok] local translation sidecar reachable: "
-            "model=google/translategemma-4b-it, device=cuda:0, policy=auto, dtype=bfloat16"
+            "endpoint=ws://127.0.0.1:10096, model=google/translategemma-4b-it, device=cuda:0, policy=auto, dtype=bfloat16"
             in result.output
         )
         assert (
-            "[ok] translation configured: translategemma_local (127.0.0.1:10096)"
-            in result.output
+            "Translation: translategemma_local (127.0.0.1:10096) -> en" in result.output
         )
 
     def test_when_local_translategemma_probe_fails__then_it_prints_sidecar_hint(

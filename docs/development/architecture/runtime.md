@@ -12,8 +12,17 @@ This document records the current runtime contract for the async capture-to-capt
 
 - `vrc-live-caption devices` lists input devices with index, default marker, maximum input channels, and default sample rate.
 - `vrc-live-caption doctor` validates config loading, resolves the configured input device, and runs a short stream probe.
-- `vrc-live-caption run` starts the async live pipeline and prints normalized STT status plus chatbox preview lines.
-- `vrc-live-caption record-sample` records a WAV file using the same capture service and defaults to 10 seconds.
+- `vrc-live-caption run` prints a startup summary before provider validation or sidecar connection work begins:
+  - config path
+  - input device selector
+  - OSC target
+  - STT backend
+  - translation status
+  - local sidecar endpoints when the configured backend is repository-local
+  - log file path
+- `vrc-live-caption run` prints `[ok] Runtime ready: ...` only after the async pipeline is fully started, then continues with normalized STT status lines plus chatbox preview lines.
+- `vrc-live-caption record-sample` records a WAV file using the same capture service and defaults to 10 seconds, and prints both the resolved config path and output WAV path before recording starts.
+- `vrc-live-caption local-stt serve` and `vrc-live-caption local-translation serve` print config source, websocket endpoint, log file path, runtime model or device policy, and an explicit sidecar-ready line once the websocket listener is bound and usable.
 - `doctor`, `run`, and `record-sample` accept `--console-log-level` and `--file-log-level` overrides for one-off troubleshooting.
 
 ## Configuration Contract

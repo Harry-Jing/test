@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -24,6 +25,15 @@ class ResolvedFunasrDevice:
     resolved_device: str
     cuda_available: bool
     ngpu: int
+
+
+@dataclass(frozen=True, slots=True)
+class FunasrLocalServerReadyInfo:
+    """Store the CLI-facing readiness details for the local FunASR sidecar."""
+
+    endpoint: str
+    resolved_device: str
+    device_policy: str
 
 
 class AutoModelFunasrBundle(FunasrModelBundle):
@@ -221,6 +231,7 @@ async def run_funasr_local_server(
     host: str,
     port: int,
     logger: logging.Logger,
+    ready_callback: Callable[[FunasrLocalServerReadyInfo], None] | None = None,
 ) -> None:
     """Start the local websocket sidecar and wait until it stops."""
     executor = ThreadPoolExecutor(max_workers=max(config.ncpu, 2))
@@ -266,6 +277,14 @@ async def run_funasr_local_server(
 
         async with serve(handle_connection, host, port, ping_interval=None) as server:
             logger.info("Local FunASR sidecar listening on ws://%s:%s", host, port)
+            if ready_callback is not None:
+                ready_callback(
+                    FunasrLocalServerReadyInfo(
+                        endpoint=f"ws://{host}:{port}",
+                        resolved_device=runtime_device.resolved_device,
+                        device_policy=runtime_device.device_policy,
+                    )
+                )
             await server.wait_closed()
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
@@ -273,6 +292,7 @@ async def run_funasr_local_server(
 
 __all__ = [
     "AutoModelFunasrBundle",
+    "FunasrLocalServerReadyInfo",
     "ResolvedFunasrDevice",
     "resolve_funasr_runtime_device",
     "run_funasr_local_server",

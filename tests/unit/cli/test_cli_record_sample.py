@@ -46,6 +46,9 @@ class TestRecordSampleCommand:
 
         assert result.exit_code == 0
         assert output_path.exists()
+        assert f"Config: {config_path}" in result.output
+        assert f"Output WAV: {output_path}" in result.output
+        assert "[info] Recording 0.10s sample..." in result.output
         assert f"Recorded sample: {output_path}" in result.output
 
     def test_when_audio_capture_fails_to_start__then_it_exits_non_zero(

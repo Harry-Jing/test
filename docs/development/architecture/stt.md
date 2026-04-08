@@ -79,6 +79,7 @@ This document records the current STT contract.
 
 - `FunasrLocalBackend` validates capture shape for `16000 Hz`, mono, `int16` audio.
 - The backend connects to a repository-local websocket sidecar started by `vrc-live-caption local-stt serve`.
+- `local-stt serve` prints the resolved websocket endpoint, configured model names, device policy, log file path, and an explicit ready line after the listener is accepting connections.
 - Main-app config stores sidecar connection settings under `[stt.providers.funasr_local]`.
 - Model selection, device policy, chunking, VAD, punctuation, and runtime thread settings live under `[stt.providers.funasr_local.sidecar]`.
 - Each attempt creates a fresh `FunasrLocalConnectionState`.
@@ -87,7 +88,7 @@ This document records the current STT contract.
 - The sidecar protocol is internal to the repository:
   - client sends `start`, raw PCM16 audio frames, then `stop`
   - server emits `ready`, `transcript`, and `error`
-  - `ready` includes the resolved sidecar device metadata so `doctor` and runtime logs can distinguish `cpu` from `cuda:0`
+  - `ready` includes the resolved sidecar device metadata so `doctor`, runtime logs, and the CLI ready line can distinguish `cpu` from `cuda:0`
 - Sidecar `online` and `offline` transcript phases are normalized into the shared `TranscriptRevisionEvent` surface:
   - online phase emits `is_final = false`
   - offline phase emits the final revision with `is_final = true`

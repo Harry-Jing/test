@@ -3,6 +3,9 @@ from typing import Any
 
 from vrc_live_caption.cli import app
 from vrc_live_caption.errors import TranslationError
+from vrc_live_caption.local_translation.translategemma.server import (
+    TranslateGemmaLocalServerReadyInfo,
+)
 
 
 class TestLocalTranslationServeCommand:
@@ -15,11 +18,20 @@ class TestLocalTranslationServeCommand:
         captured: dict[str, Any] = {}
 
         async def fake_run_translategemma_local_server(
-            *, config, host, port, logger
+            *, config, host, port, logger, ready_callback
         ) -> None:
             captured["config"] = config
             captured["host"] = host
             captured["port"] = port
+            ready_callback(
+                TranslateGemmaLocalServerReadyInfo(
+                    endpoint=f"ws://{host}:{port}",
+                    model=config.model,
+                    resolved_device="cpu",
+                    device_policy=config.device,
+                    resolved_dtype="float32",
+                )
+            )
 
         monkeypatch.setattr(
             "vrc_live_caption.cli.run_translategemma_local_server",
@@ -47,13 +59,19 @@ class TestLocalTranslationServeCommand:
         assert captured["port"] == 11096
         assert captured["config"].model == "custom/translategemma"
         assert f"App config: {config_path}" in result.output
-        assert "Local translation model: custom/translategemma" in result.output
-        assert "Local translation device policy: cpu" in result.output
-        assert "Local translation dtype policy: float32" in result.output
+        assert "Endpoint: ws://127.0.0.2:11096" in result.output
+        assert "Model: custom/translategemma" in result.output
+        assert "Device policy: cpu" in result.output
+        assert "Dtype policy: float32" in result.output
+        assert "Max new tokens: 256" in result.output
+        assert "Log file:" in result.output
+        assert "[info] Loading model and opening websocket listener..." in result.output
         assert (
-            "Starting local TranslateGemma sidecar on ws://127.0.0.2:11096"
+            "[ok] Local TranslateGemma sidecar ready: "
+            "ws://127.0.0.2:11096, model=custom/translategemma, device=cpu, dtype=float32"
             in result.output
         )
+        assert "Keep this terminal open. Press Ctrl+C to stop." in result.output
 
     def test_when_app_config_is_invalid__then_it_exits_non_zero(
         self,
@@ -134,3 +152,7 @@ class TestLocalTranslationServeCommand:
         result = cli_runner.invoke(app, ["local-translation", "serve"])
 
         assert result.exit_code == 0
+        assert (
+            "Stop requested. Shutting down local TranslateGemma sidecar."
+            in result.output
+        )

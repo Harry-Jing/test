@@ -118,6 +118,17 @@ uv run vrc-live-caption doctor
 uv run vrc-live-caption run
 ```
 
+Expected `local-stt serve` output:
+
+- `Endpoint: ws://...`
+- `Device policy: ...`
+- `Offline ASR model: ...`
+- `Online ASR model: ...`
+- `VAD model: ...`
+- `Punctuation model: ...`
+- `Log file: ...`
+- `[ok] Local FunASR sidecar ready: ...`
+
 Common errors:
 
 - `FunASR dependencies are not installed`: install `local-cpu` or `local-cu130`.
@@ -211,6 +222,16 @@ uv run vrc-live-caption local-translation serve
 uv run vrc-live-caption doctor
 uv run vrc-live-caption run
 ```
+
+Expected `local-translation serve` output:
+
+- `Endpoint: ws://...`
+- `Model: ...`
+- `Device policy: ...`
+- `Dtype policy: ...`
+- `Max new tokens: ...`
+- `Log file: ...`
+- `[ok] Local TranslateGemma sidecar ready: ...`
 
 Environment prerequisites:
 

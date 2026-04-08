@@ -14,8 +14,12 @@ from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
 from .env import AppSecrets, SecretError
 from .errors import OscError, VrcLiveCaptionError
 from .local_stt.funasr import run_funasr_local_server
+from .local_stt.funasr.server import FunasrLocalServerReadyInfo
 from .local_translation.translategemma import (
     run_translategemma_local_server,
+)
+from .local_translation.translategemma.server import (
+    TranslateGemmaLocalServerReadyInfo,
 )
 from .logging_utils import configure_logging
 from .osc import OscChatboxTransport
@@ -301,6 +305,168 @@ def _format_device_row(device: AudioDeviceInfo) -> str:
     )
 
 
+def _format_device_selector(device_selector: int | str | None) -> str:
+    if device_selector is None:
+        return "default"
+    return str(device_selector)
+
+
+def _format_sidecar_endpoint(*, host: str, port: int, use_ssl: bool) -> str:
+    scheme = "wss" if use_ssl else "ws"
+    return f"{scheme}://{host}:{port}"
+
+
+def _format_translation_summary(app_config: AppConfig) -> str:
+    if not app_config.translation.enabled:
+        return "disabled"
+    return (
+        f"{describe_translation_backend(app_config.translation)} "
+        f"-> {app_config.translation.target_language} "
+        f"(mode={app_config.translation.output_mode}, "
+        f"strategy={app_config.translation.strategy})"
+    )
+
+
+def _emit_optional_config_status(
+    *,
+    resolved_config_path: Path,
+    config_exists: bool,
+    command_name: str,
+) -> None:
+    if config_exists:
+        typer.echo(f"App config: {resolved_config_path}")
+        return
+    typer.echo(
+        f"[warn] config missing: {resolved_config_path} "
+        f"({command_name} used built-in defaults)"
+    )
+
+
+def _emit_run_startup_summary(
+    *,
+    app_config: AppConfig,
+    resolved_config_path: Path,
+) -> None:
+    typer.echo(f"Config: {resolved_config_path}")
+    typer.echo(
+        f"Input device selector: {_format_device_selector(app_config.capture.device)}"
+    )
+    typer.echo(f"OSC target: {app_config.osc.host}:{app_config.osc.port}")
+    typer.echo(f"STT backend: {describe_stt_backend(app_config.stt)}")
+    if app_config.stt.provider == "funasr_local":
+        provider_config = app_config.stt.providers.funasr_local
+        typer.echo(
+            "STT sidecar endpoint: "
+            f"{_format_sidecar_endpoint(host=provider_config.host, port=provider_config.port, use_ssl=provider_config.use_ssl)}"
+        )
+    typer.echo(f"Translation: {_format_translation_summary(app_config)}")
+    if (
+        app_config.translation.enabled
+        and app_config.translation.provider == "translategemma_local"
+    ):
+        provider_config = app_config.translation.providers.translategemma_local
+        typer.echo(
+            "Translation sidecar endpoint: "
+            f"{_format_sidecar_endpoint(host=provider_config.host, port=provider_config.port, use_ssl=provider_config.use_ssl)}"
+        )
+    typer.echo(f"Log file: {app_config.logging.file_path}")
+    typer.echo("[info] Starting runtime pipeline...")
+
+
+def _emit_local_stt_ready_message(info: FunasrLocalServerReadyInfo) -> None:
+    typer.echo(
+        "[ok] Local FunASR sidecar ready: "
+        f"{info.endpoint}, device={info.resolved_device}, policy={info.device_policy}"
+    )
+    typer.echo("Keep this terminal open. Press Ctrl+C to stop.")
+
+
+def _emit_local_translation_ready_message(
+    info: TranslateGemmaLocalServerReadyInfo,
+) -> None:
+    typer.echo(
+        "[ok] Local TranslateGemma sidecar ready: "
+        f"{info.endpoint}, model={info.model}, device={info.resolved_device}, dtype={info.resolved_dtype}"
+    )
+    typer.echo("Keep this terminal open. Press Ctrl+C to stop.")
+
+
+def _emit_local_stt_startup_summary(
+    *,
+    resolved_config_path: Path,
+    config_exists: bool,
+    endpoint: str,
+    log_file: Path,
+    local_config,
+) -> None:
+    _emit_optional_config_status(
+        resolved_config_path=resolved_config_path,
+        config_exists=config_exists,
+        command_name="local-stt serve",
+    )
+    typer.echo(f"Endpoint: {endpoint}")
+    typer.echo(f"Device policy: {local_config.device}")
+    typer.echo(f"Offline ASR model: {local_config.offline_asr_model}")
+    typer.echo(f"Online ASR model: {local_config.online_asr_model}")
+    typer.echo(f"VAD model: {local_config.vad_model}")
+    typer.echo(f"Punctuation model: {local_config.punc_model or 'disabled'}")
+    typer.echo(f"Log file: {log_file}")
+    typer.echo("[info] Loading models and opening websocket listener...")
+
+
+def _emit_local_translation_startup_summary(
+    *,
+    resolved_config_path: Path,
+    config_exists: bool,
+    endpoint: str,
+    log_file: Path,
+    local_config,
+) -> None:
+    _emit_optional_config_status(
+        resolved_config_path=resolved_config_path,
+        config_exists=config_exists,
+        command_name="local-translation serve",
+    )
+    typer.echo(f"Endpoint: {endpoint}")
+    typer.echo(f"Model: {local_config.model}")
+    typer.echo(f"Device policy: {local_config.device}")
+    typer.echo(f"Dtype policy: {local_config.dtype}")
+    typer.echo(f"Max new tokens: {local_config.max_new_tokens}")
+    typer.echo(f"Log file: {log_file}")
+    typer.echo("[info] Loading model and opening websocket listener...")
+
+
+def _format_local_stt_probe_result(app_config: AppConfig, probe_result) -> str:
+    provider_config = app_config.stt.providers.funasr_local
+    details = [
+        f"endpoint={_format_sidecar_endpoint(host=provider_config.host, port=provider_config.port, use_ssl=provider_config.use_ssl)}"
+    ]
+    if probe_result.resolved_device:
+        details.append(f"device={probe_result.resolved_device}")
+    if probe_result.device_policy:
+        details.append(f"policy={probe_result.device_policy}")
+    return ", ".join(details)
+
+
+def _format_local_translation_probe_result(
+    app_config: AppConfig,
+    probe_result,
+) -> str:
+    provider_config = app_config.translation.providers.translategemma_local
+    details = [
+        f"endpoint={_format_sidecar_endpoint(host=provider_config.host, port=provider_config.port, use_ssl=provider_config.use_ssl)}"
+    ]
+    if probe_result.model:
+        details.append(f"model={probe_result.model}")
+    if probe_result.resolved_device:
+        details.append(f"device={probe_result.resolved_device}")
+    if probe_result.device_policy:
+        details.append(f"policy={probe_result.device_policy}")
+    if probe_result.resolved_dtype:
+        details.append(f"dtype={probe_result.resolved_dtype}")
+    return ", ".join(details)
+
+
 def _apply_logging_overrides(
     config: LoggingConfig,
     *,
@@ -353,29 +519,23 @@ async def _run_live_command(
     resolved_config_path: Path,
     root_logger: logging.Logger,
 ) -> None:
-    controller = create_live_pipeline_controller(
-        app_config=app_config,
-        logger=root_logger,
-        emit_line=typer.echo,
-    )
     shutdown_logger = root_logger.getChild("cli")
+    controller: LivePipelineController | None = None
+    _emit_run_startup_summary(
+        app_config=app_config,
+        resolved_config_path=resolved_config_path,
+    )
     try:
-        await controller.start()
-        typer.echo(f"Running with config: {resolved_config_path}")
-        typer.echo(
-            "Input device: "
-            f"{controller.resolved_device.label if controller.resolved_device else 'unresolved'}"
+        controller = create_live_pipeline_controller(
+            app_config=app_config,
+            logger=root_logger,
+            emit_line=typer.echo,
         )
-        typer.echo(f"OSC target: {app_config.osc.host}:{app_config.osc.port}")
-        typer.echo(f"STT backend: {controller.backend_description}")
-        if app_config.translation.enabled:
-            typer.echo(
-                "Translation: "
-                f"{describe_translation_backend(app_config.translation)} "
-                f"-> {app_config.translation.target_language} "
-                f"(mode={app_config.translation.output_mode}, "
-                f"strategy={app_config.translation.strategy})"
-            )
+        await controller.start()
+        typer.echo(
+            "[ok] Runtime ready: "
+            f"input_device={controller.resolved_device.label if controller.resolved_device else 'unresolved'}"
+        )
         typer.echo("Press Ctrl+C to stop.")
         await controller.run_forever()
     except asyncio.CancelledError:
@@ -383,12 +543,13 @@ async def _run_live_command(
             raise
         typer.echo("Stopping... Press Ctrl+C again to force exit.")
     finally:
-        try:
-            await controller.stop()
-        except _INTERRUPT_EXCEPTIONS:
-            raise
-        except Exception as exc:
-            _log_shutdown_failure(shutdown_logger, "Runner shutdown failed", exc)
+        if controller is not None:
+            try:
+                await controller.stop()
+            except _INTERRUPT_EXCEPTIONS:
+                raise
+            except Exception as exc:
+                _log_shutdown_failure(shutdown_logger, "Runner shutdown failed", exc)
 
 
 async def _run_record_sample_command(
@@ -497,7 +658,7 @@ def doctor(
         exit_code = 1
         typer.echo(f"[error] osc target configuration failed: {exc}")
 
-    typer.echo(f"[ok] stt backend configured: {describe_stt_backend(app_config.stt)}")
+    typer.echo(f"STT backend: {describe_stt_backend(app_config.stt)}")
     if app_config.stt.provider == "funasr_local":
         try:
             probe_result = asyncio.run(
@@ -507,18 +668,21 @@ def doctor(
                     timeout_seconds=app_config.stt.retry.connect_timeout_seconds,
                 )
             )
-            if probe_result.resolved_device:
-                suffix = f": {probe_result.resolved_device}"
-                if probe_result.device_policy:
-                    suffix += f" (policy={probe_result.device_policy})"
-                typer.echo(f"[ok] local STT sidecar reachable{suffix}")
-            else:
-                typer.echo("[ok] local STT sidecar reachable")
+            typer.echo(
+                "[ok] local STT sidecar reachable: "
+                f"{_format_local_stt_probe_result(app_config, probe_result)}"
+            )
         except Exception as exc:
             exit_code = 1
             typer.echo(f"[error] local STT sidecar check failed: {exc}")
+            endpoint = _format_sidecar_endpoint(
+                host=app_config.stt.providers.funasr_local.host,
+                port=app_config.stt.providers.funasr_local.port,
+                use_ssl=app_config.stt.providers.funasr_local.use_ssl,
+            )
             typer.echo(
-                "        Hint: start `vrc-live-caption local-stt serve` and confirm host/port match [stt.providers.funasr_local]."
+                "        Hint: start `vrc-live-caption local-stt serve` so "
+                f"{endpoint} is available, or update [stt.providers.funasr_local]."
             )
     else:
         try:
@@ -531,36 +695,31 @@ def doctor(
                 "        Hint: create a .env file in the repo root or export the backend-specific credentials."
             )
 
-    if app_config.translation.enabled:
+    if not app_config.translation.enabled:
+        typer.echo("[ok] translation disabled")
+    else:
+        typer.echo(f"Translation: {_format_translation_summary(app_config)}")
         if app_config.translation.provider == "translategemma_local":
             try:
                 probe_result = probe_translategemma_local_service(
                     provider_config=app_config.translation.providers.translategemma_local,
                     timeout_seconds=app_config.translation.request_timeout_seconds,
                 )
-                details: list[str] = []
-                if probe_result.model:
-                    details.append(f"model={probe_result.model}")
-                if probe_result.resolved_device:
-                    details.append(f"device={probe_result.resolved_device}")
-                if probe_result.device_policy:
-                    details.append(f"policy={probe_result.device_policy}")
-                if probe_result.resolved_dtype:
-                    details.append(f"dtype={probe_result.resolved_dtype}")
-                suffix = f": {', '.join(details)}" if details else ""
-                typer.echo(f"[ok] local translation sidecar reachable{suffix}")
                 typer.echo(
-                    "[ok] translation configured: "
-                    f"{describe_translation_backend(app_config.translation)} "
-                    f"-> {app_config.translation.target_language} "
-                    f"(mode={app_config.translation.output_mode}, "
-                    f"strategy={app_config.translation.strategy})"
+                    "[ok] local translation sidecar reachable: "
+                    f"{_format_local_translation_probe_result(app_config, probe_result)}"
                 )
             except VrcLiveCaptionError as exc:
                 exit_code = 1
                 typer.echo(f"[error] {exc}")
+                endpoint = _format_sidecar_endpoint(
+                    host=app_config.translation.providers.translategemma_local.host,
+                    port=app_config.translation.providers.translategemma_local.port,
+                    use_ssl=app_config.translation.providers.translategemma_local.use_ssl,
+                )
                 typer.echo(
-                    "        Hint: start `vrc-live-caption local-translation serve` and confirm host/port match [translation.providers.translategemma_local]."
+                    "        Hint: start `vrc-live-caption local-translation serve` so "
+                    f"{endpoint} is available, or update [translation.providers.translategemma_local]."
                 )
         else:
             try:
@@ -569,13 +728,7 @@ def doctor(
                     secrets=AppSecrets(),
                     logger=root_logger.getChild("translation"),
                 )
-                typer.echo(
-                    "[ok] translation configured: "
-                    f"{describe_translation_backend(app_config.translation)} "
-                    f"-> {app_config.translation.target_language} "
-                    f"(mode={app_config.translation.output_mode}, "
-                    f"strategy={app_config.translation.strategy})"
-                )
+                typer.echo("[ok] translation runtime validated")
             except (SecretError, VrcLiveCaptionError) as exc:
                 exit_code = 1
                 typer.echo(f"[error] {exc}")
@@ -629,6 +782,7 @@ def osc_test(
             app_config=app_config,
             logger=root_logger.getChild("osc"),
         )
+        typer.echo(f"OSC target: {transport.host}:{transport.port}")
         if typing is not None:
             typing_state = _parse_cli_bool(typing, context="--typing")
             transport.send_typing(typing_state)
@@ -720,9 +874,9 @@ def record_sample(
     )
 
     try:
-        typer.echo(
-            f"Recording {seconds:.2f}s sample with config: {resolved_config_path}"
-        )
+        typer.echo(f"Config: {resolved_config_path}")
+        typer.echo(f"Output WAV: {output_path}")
+        typer.echo(f"[info] Recording {seconds:.2f}s sample...")
         asyncio.run(
             _run_record_sample_command(
                 app_config=app_config,
@@ -773,15 +927,18 @@ def local_stt_serve(
         resolved_host,
         resolved_port,
     )
-
-    if config_exists:
-        typer.echo(f"App config: {resolved_config_path}")
-    else:
-        typer.echo(
-            f"[warn] config missing: {resolved_config_path} (local-stt serve used built-in defaults)"
-        )
-    typer.echo(f"Local STT device policy: {local_config.device}")
-    typer.echo(f"Starting local FunASR sidecar on ws://{resolved_host}:{resolved_port}")
+    endpoint = _format_sidecar_endpoint(
+        host=resolved_host,
+        port=resolved_port,
+        use_ssl=provider_config.use_ssl,
+    )
+    _emit_local_stt_startup_summary(
+        resolved_config_path=resolved_config_path,
+        config_exists=config_exists,
+        endpoint=endpoint,
+        log_file=logging_config.file_path,
+        local_config=local_config,
+    )
 
     try:
         asyncio.run(
@@ -790,9 +947,11 @@ def local_stt_serve(
                 host=resolved_host,
                 port=resolved_port,
                 logger=root_logger.getChild("local_stt.funasr"),
+                ready_callback=_emit_local_stt_ready_message,
             )
         )
     except KeyboardInterrupt:
+        typer.echo("[info] Stop requested. Shutting down local FunASR sidecar.")
         return
     except VrcLiveCaptionError as exc:
         logger.error("local-stt serve failed: %s", exc)
@@ -836,18 +995,17 @@ def local_translation_serve(
         resolved_host,
         resolved_port,
     )
-
-    if config_exists:
-        typer.echo(f"App config: {resolved_config_path}")
-    else:
-        typer.echo(
-            f"[warn] config missing: {resolved_config_path} (local-translation serve used built-in defaults)"
-        )
-    typer.echo(f"Local translation model: {local_config.model}")
-    typer.echo(f"Local translation device policy: {local_config.device}")
-    typer.echo(f"Local translation dtype policy: {local_config.dtype}")
-    typer.echo(
-        f"Starting local TranslateGemma sidecar on ws://{resolved_host}:{resolved_port}"
+    endpoint = _format_sidecar_endpoint(
+        host=resolved_host,
+        port=resolved_port,
+        use_ssl=provider_config.use_ssl,
+    )
+    _emit_local_translation_startup_summary(
+        resolved_config_path=resolved_config_path,
+        config_exists=config_exists,
+        endpoint=endpoint,
+        log_file=logging_config.file_path,
+        local_config=local_config,
     )
 
     try:
@@ -857,9 +1015,11 @@ def local_translation_serve(
                 host=resolved_host,
                 port=resolved_port,
                 logger=root_logger.getChild("local_translation.translategemma"),
+                ready_callback=_emit_local_translation_ready_message,
             )
         )
     except KeyboardInterrupt:
+        typer.echo("[info] Stop requested. Shutting down local TranslateGemma sidecar.")
         return
     except VrcLiveCaptionError as exc:
         logger.error("local-translation serve failed: %s", exc)

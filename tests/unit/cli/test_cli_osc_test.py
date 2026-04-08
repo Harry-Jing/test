@@ -32,6 +32,7 @@ class TestOscTestCommand:
         assert result.exit_code == 0
         assert osc_transport.typing_messages == [True]
         assert osc_transport.text_messages == ["hello world"]
+        assert "OSC target: 127.0.0.1:9000" in result.output
         assert "Sent chatbox text to 127.0.0.1:9000" in result.output
         assert "[chatbox] hello world" in result.output
 

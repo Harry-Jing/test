@@ -4,14 +4,17 @@ from contextlib import nullcontext
 
 import pytest
 
+from tests.unit.local_stt._server_support import FakeServeContext
 from vrc_live_caption.errors import TranslationError
 from vrc_live_caption.local_translation.translategemma.config import (
     TranslateGemmaLocalServiceConfig,
 )
 from vrc_live_caption.local_translation.translategemma.server import (
     ResolvedTranslateGemmaRuntime,
+    TranslateGemmaLocalServerReadyInfo,
     TranslateGemmaModelBundle,
     resolve_translategemma_runtime,
+    run_translategemma_local_server,
 )
 
 
@@ -53,6 +56,20 @@ class _FakeModel:
     def generate(self, **kwargs):
         self.generate_calls.append(kwargs)
         return [[10, 20, 30, 40]]
+
+
+class _FakeWebsocket:
+    def __init__(self, messages: list[object] | None = None) -> None:
+        self._messages = list(messages or [])
+        self.sent: list[str] = []
+
+    async def send(self, message: str) -> None:
+        self.sent.append(message)
+
+    async def recv(self) -> object:
+        if self._messages:
+            return self._messages.pop(0)
+        raise RuntimeError("no message queued")
 
 
 class TestTranslateGemmaModelBundleLoad:
@@ -280,3 +297,60 @@ class TestResolveTranslateGemmaRuntime:
                 dtype_policy="auto",
                 torch_module=fake_torch,
             )
+
+
+@pytest.mark.asyncio
+class TestRunTranslateGemmaLocalServer:
+    async def test_when_server_starts__then_it_reports_ready_details(
+        self,
+        monkeypatch,
+    ) -> None:
+        ready_events: list[TranslateGemmaLocalServerReadyInfo] = []
+        serve_context = FakeServeContext()
+
+        monkeypatch.setattr(
+            "vrc_live_caption.local_translation.translategemma.server._load_torch_module",
+            lambda: type(
+                "FakeTorch",
+                (),
+                {
+                    "bfloat16": "bfloat16",
+                    "float32": "float32",
+                    "cuda": type(
+                        "FakeCuda",
+                        (),
+                        {
+                            "is_available": staticmethod(lambda: True),
+                            "device_count": staticmethod(lambda: 1),
+                        },
+                    )(),
+                },
+            )(),
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.local_translation.translategemma.server.TranslateGemmaModelBundle.load",
+            lambda **kwargs: object(),
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.local_translation.translategemma.server.serve",
+            serve_context,
+        )
+
+        await run_translategemma_local_server(
+            config=TranslateGemmaLocalServiceConfig(),
+            host="127.0.0.1",
+            port=10096,
+            logger=logging.getLogger("test.local_translation.server.run"),
+            ready_callback=ready_events.append,
+        )
+
+        assert serve_context.host == "127.0.0.1"
+        assert serve_context.port == 10096
+        assert serve_context.ping_interval is None
+        assert ready_events[0] == TranslateGemmaLocalServerReadyInfo(
+            endpoint="ws://127.0.0.1:10096",
+            model="google/translategemma-4b-it",
+            resolved_device="cuda:0",
+            device_policy="auto",
+            resolved_dtype="bfloat16",
+        )

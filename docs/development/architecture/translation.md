@@ -25,10 +25,11 @@ This document records the current translation-layer contract.
 - DeepL credentials come from `DEEPL_AUTH_KEY`.
 - Google Cloud Translation uses ADC plus `translation.providers.google_cloud.project_id`.
 - Local TranslateGemma translation uses a repository-local websocket sidecar started by `vrc-live-caption local-translation serve`.
+- `local-translation serve` prints the resolved websocket endpoint, model, device and dtype policy, log file path, and an explicit ready line after the listener is accepting connections.
 - Main-app config stores sidecar connection settings under `[translation.providers.translategemma_local]`.
 - Sidecar model selection, device policy, dtype policy, and generation settings live under `[translation.providers.translategemma_local.sidecar]`.
 - The sidecar preloads the configured model before it reports `ready`.
-- `ready` includes sidecar model and resolved device metadata so `doctor` and runtime logs can distinguish cache, device, and dtype setup problems.
+- `ready` includes sidecar model and resolved device metadata so `doctor`, runtime logs, and the CLI ready line can distinguish cache, device, and dtype setup problems.
 
 ## Rendering Contract
 

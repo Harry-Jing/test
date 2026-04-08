@@ -13,7 +13,10 @@ from vrc_live_caption.local_stt.funasr.protocol import (
     build_error_message,
     decode_json_message,
 )
-from vrc_live_caption.local_stt.funasr.server import run_funasr_local_server
+from vrc_live_caption.local_stt.funasr.server import (
+    FunasrLocalServerReadyInfo,
+    run_funasr_local_server,
+)
 
 
 @pytest.mark.asyncio
@@ -23,6 +26,7 @@ class TestRunFunasrLocalServer:
         monkeypatch,
     ) -> None:
         session_inits: list[dict] = []
+        ready_events: list[FunasrLocalServerReadyInfo] = []
         serve_context = FakeServeContext(websocket=FakeWebsocket())
         models = object()
 
@@ -54,11 +58,15 @@ class TestRunFunasrLocalServer:
             host="127.0.0.1",
             port=10095,
             logger=logging.getLogger("test.local_stt.server.run"),
+            ready_callback=ready_events.append,
         )
 
         assert serve_context.host == "127.0.0.1"
         assert serve_context.port == 10095
         assert serve_context.ping_interval is None
+        assert ready_events[0].endpoint == "ws://127.0.0.1:10095"
+        assert ready_events[0].resolved_device == "cuda:0"
+        assert ready_events[0].device_policy == "auto"
         assert session_inits[0]["models"] is models
         assert session_inits[0]["resolved_device"] == "cuda:0"
         assert session_inits[0]["device_policy"] == "auto"

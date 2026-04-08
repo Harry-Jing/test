@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -32,6 +33,17 @@ class ResolvedTranslateGemmaRuntime:
     resolved_dtype: str
     torch_dtype: Any
     cuda_available: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TranslateGemmaLocalServerReadyInfo:
+    """Store the CLI-facing readiness details for the local translation sidecar."""
+
+    endpoint: str
+    model: str
+    resolved_device: str
+    device_policy: str
+    resolved_dtype: str
 
 
 class TranslateGemmaModelBundle:
@@ -253,6 +265,7 @@ async def run_translategemma_local_server(
     host: str,
     port: int,
     logger: logging.Logger,
+    ready_callback: Callable[[TranslateGemmaLocalServerReadyInfo], None] | None = None,
 ) -> None:
     """Start the local TranslateGemma websocket sidecar and wait until it stops."""
     executor = ThreadPoolExecutor(max_workers=1)
@@ -322,6 +335,16 @@ async def run_translategemma_local_server(
             logger.info(
                 "Local TranslateGemma sidecar listening on ws://%s:%s", host, port
             )
+            if ready_callback is not None:
+                ready_callback(
+                    TranslateGemmaLocalServerReadyInfo(
+                        endpoint=f"ws://{host}:{port}",
+                        model=config.model,
+                        resolved_device=runtime.resolved_device,
+                        device_policy=runtime.device_policy,
+                        resolved_dtype=runtime.resolved_dtype,
+                    )
+                )
             await server.wait_closed()
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
@@ -329,6 +352,7 @@ async def run_translategemma_local_server(
 
 __all__ = [
     "ResolvedTranslateGemmaRuntime",
+    "TranslateGemmaLocalServerReadyInfo",
     "TranslateGemmaModelBundle",
     "resolve_translategemma_runtime",
     "run_translategemma_local_server",

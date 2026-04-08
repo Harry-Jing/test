@@ -77,8 +77,15 @@ class TestRunCommand:
         result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
 
         assert result.exit_code == 0
+        assert f"Config: {config_path}" in result.output
+        assert "Input device selector: default" in result.output
         assert "OSC target: 127.0.0.1:9000" in result.output
         assert "STT backend: iflytek_rtasr (autodialect, near_field)" in result.output
+        assert "Translation: disabled" in result.output
+        assert "Log file:" in result.output
+        assert "[info] Starting runtime pipeline..." in result.output
+        assert "[ok] Runtime ready: input_device=" in result.output
+        assert "Fake Mic" in result.output
 
     def test_when_asyncio_cancellation_happens__then_it_stops_gracefully(
         self,
@@ -115,6 +122,28 @@ class TestRunCommand:
         assert controller.stop_calls == 1
         assert shutdown_failures == []
         assert "Stopping... Press Ctrl+C again to force exit." in result.output
+
+    def test_when_controller_creation_fails__then_it_prints_startup_summary_first(
+        self,
+        monkeypatch,
+        config_file_factory,
+        cli_runner,
+    ) -> None:
+        config_path = config_file_factory()
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.create_live_pipeline_controller",
+            lambda *, app_config, logger, emit_line: (_ for _ in ()).throw(
+                AudioRuntimeError("controller build failed")
+            ),
+        )
+
+        result = cli_runner.invoke(app, ["run", "--config", str(config_path)])
+
+        assert result.exit_code == 1
+        assert f"Config: {config_path}" in result.output
+        assert "Translation: disabled" in result.output
+        assert "[info] Starting runtime pipeline..." in result.output
+        assert "controller build failed" in result.output
 
     def test_when_iflytek_secret_is_missing__then_it_exits_non_zero(
         self,
