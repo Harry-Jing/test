@@ -33,12 +33,14 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
         stt_overrides: dict[str, Any] | None = None,
         stt_retry_overrides: dict[str, Any] | None = None,
         funasr_local_overrides: dict[str, Any] | None = None,
+        funasr_local_sidecar_overrides: dict[str, Any] | None = None,
         iflytek_rtasr_overrides: dict[str, Any] | None = None,
         openai_realtime_overrides: dict[str, Any] | None = None,
         translation_overrides: dict[str, Any] | None = None,
         translation_chatbox_layout_overrides: dict[str, Any] | None = None,
         google_cloud_translation_overrides: dict[str, Any] | None = None,
         translategemma_local_translation_overrides: dict[str, Any] | None = None,
+        translategemma_local_sidecar_overrides: dict[str, Any] | None = None,
     ) -> Path:
         target = path or tmp_path / "app.toml"
         write_test_config(
@@ -52,12 +54,14 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
             stt_overrides=stt_overrides,
             stt_retry_overrides=stt_retry_overrides,
             funasr_local_overrides=funasr_local_overrides,
+            funasr_local_sidecar_overrides=funasr_local_sidecar_overrides,
             iflytek_rtasr_overrides=iflytek_rtasr_overrides,
             openai_realtime_overrides=openai_realtime_overrides,
             translation_overrides=translation_overrides,
             translation_chatbox_layout_overrides=translation_chatbox_layout_overrides,
             google_cloud_translation_overrides=google_cloud_translation_overrides,
             translategemma_local_translation_overrides=translategemma_local_translation_overrides,
+            translategemma_local_sidecar_overrides=translategemma_local_sidecar_overrides,
         )
         return target
 

@@ -22,8 +22,6 @@ venv/
 .env
 .runtime/
 vrc-live-caption.toml
-local-stt-funasr.toml
-local-translation-translategemma.toml
 
 # Developing docs artifacts
 docs/.gitignore

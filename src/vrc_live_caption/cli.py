@@ -13,9 +13,8 @@ from .chatbox import ChatboxOutput
 from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
 from .env import AppSecrets, SecretError
 from .errors import OscError, VrcLiveCaptionError
-from .local_stt.funasr import FunasrLocalServiceConfig, run_funasr_local_server
+from .local_stt.funasr import run_funasr_local_server
 from .local_translation.translategemma import (
-    TranslateGemmaLocalServiceConfig,
     run_translategemma_local_server,
 )
 from .logging_utils import configure_logging
@@ -105,25 +104,25 @@ LocalSttConfigPathOption = Annotated[
     Path | None,
     typer.Option(
         "--config",
-        help="Path to the local STT sidecar TOML config file.",
+        help="Path to the application TOML config file.",
         rich_help_panel="Configuration",
     ),
 ]
 LocalSttHostOption = Annotated[
-    str,
+    str | None,
     typer.Option(
         "--host",
-        help="Host interface for the local STT sidecar websocket server.",
+        help="Override the local STT sidecar websocket host from the app config.",
         rich_help_panel="Network",
     ),
 ]
 LocalSttPortOption = Annotated[
-    int,
+    int | None,
     typer.Option(
         "--port",
         min=1,
         max=65_535,
-        help="Port for the local STT sidecar websocket server.",
+        help="Override the local STT sidecar websocket port from the app config.",
         rich_help_panel="Network",
     ),
 ]
@@ -131,25 +130,25 @@ LocalTranslationConfigPathOption = Annotated[
     Path | None,
     typer.Option(
         "--config",
-        help="Path to the local translation sidecar TOML config file.",
+        help="Path to the application TOML config file.",
         rich_help_panel="Configuration",
     ),
 ]
 LocalTranslationHostOption = Annotated[
-    str,
+    str | None,
     typer.Option(
         "--host",
-        help="Host interface for the local translation sidecar websocket server.",
+        help="Override the local translation sidecar websocket host from the app config.",
         rich_help_panel="Network",
     ),
 ]
 LocalTranslationPortOption = Annotated[
-    int,
+    int | None,
     typer.Option(
         "--port",
         min=1,
         max=65_535,
-        help="Port for the local translation sidecar websocket server.",
+        help="Override the local translation sidecar websocket port from the app config.",
         rich_help_panel="Network",
     ),
 ]
@@ -277,30 +276,6 @@ def _load_optional_config(config_path: Path | None) -> tuple[AppConfig, Path, bo
     resolved = config_path or AppConfig.default_path()
     exists = resolved.exists()
     return AppConfig.from_toml_file(resolved, required=False), resolved, exists
-
-
-def _load_optional_local_stt_config(
-    config_path: Path | None,
-) -> tuple[FunasrLocalServiceConfig, Path, bool]:
-    resolved = config_path or FunasrLocalServiceConfig.default_path()
-    exists = resolved.exists()
-    return (
-        FunasrLocalServiceConfig.from_toml_file(resolved, required=False),
-        resolved,
-        exists,
-    )
-
-
-def _load_optional_local_translation_config(
-    config_path: Path | None,
-) -> tuple[TranslateGemmaLocalServiceConfig, Path, bool]:
-    resolved = config_path or TranslateGemmaLocalServiceConfig.default_path()
-    exists = resolved.exists()
-    return (
-        TranslateGemmaLocalServiceConfig.from_toml_file(resolved, required=False),
-        resolved,
-        exists,
-    )
 
 
 def _exit_with_error(message: str, *, code: int = 1) -> None:
@@ -769,19 +744,21 @@ def record_sample(
 @local_stt_app.command("serve", short_help="Run the local FunASR STT sidecar.")
 def local_stt_serve(
     config: LocalSttConfigPathOption = None,
-    host: LocalSttHostOption = "127.0.0.1",
-    port: LocalSttPortOption = 10095,
+    host: LocalSttHostOption = None,
+    port: LocalSttPortOption = None,
     console_log_level: ConsoleLogLevelOption = None,
     file_log_level: FileLogLevelOption = None,
 ) -> None:
     """Run the repository-local FunASR websocket sidecar."""
     try:
-        local_config, resolved_config_path, config_exists = (
-            _load_optional_local_stt_config(config)
-        )
+        app_config, resolved_config_path, config_exists = _load_optional_config(config)
     except ConfigError as exc:
         _exit_with_error(str(exc))
 
+    provider_config = app_config.stt.providers.funasr_local
+    local_config = provider_config.sidecar
+    resolved_host = host or provider_config.host
+    resolved_port = port or provider_config.port
     logging_config = _apply_logging_overrides(
         LoggingConfig(file_path=local_config.log_path),
         console_log_level=console_log_level,
@@ -793,25 +770,25 @@ def local_stt_serve(
         "local-stt serve started: config=%s config_exists=%s host=%s port=%s",
         resolved_config_path,
         config_exists,
-        host,
-        port,
+        resolved_host,
+        resolved_port,
     )
 
     if config_exists:
-        typer.echo(f"Local STT config: {resolved_config_path}")
+        typer.echo(f"App config: {resolved_config_path}")
     else:
         typer.echo(
-            f"[warn] local STT config missing: {resolved_config_path} (serve used built-in defaults)"
+            f"[warn] config missing: {resolved_config_path} (local-stt serve used built-in defaults)"
         )
     typer.echo(f"Local STT device policy: {local_config.device}")
-    typer.echo(f"Starting local FunASR sidecar on ws://{host}:{port}")
+    typer.echo(f"Starting local FunASR sidecar on ws://{resolved_host}:{resolved_port}")
 
     try:
         asyncio.run(
             run_funasr_local_server(
                 config=local_config,
-                host=host,
-                port=port,
+                host=resolved_host,
+                port=resolved_port,
                 logger=root_logger.getChild("local_stt.funasr"),
             )
         )
@@ -830,19 +807,21 @@ def local_stt_serve(
 )
 def local_translation_serve(
     config: LocalTranslationConfigPathOption = None,
-    host: LocalTranslationHostOption = "127.0.0.1",
-    port: LocalTranslationPortOption = 10096,
+    host: LocalTranslationHostOption = None,
+    port: LocalTranslationPortOption = None,
     console_log_level: ConsoleLogLevelOption = None,
     file_log_level: FileLogLevelOption = None,
 ) -> None:
     """Run the repository-local TranslateGemma websocket sidecar."""
     try:
-        local_config, resolved_config_path, config_exists = (
-            _load_optional_local_translation_config(config)
-        )
+        app_config, resolved_config_path, config_exists = _load_optional_config(config)
     except ConfigError as exc:
         _exit_with_error(str(exc))
 
+    provider_config = app_config.translation.providers.translategemma_local
+    local_config = provider_config.sidecar
+    resolved_host = host or provider_config.host
+    resolved_port = port or provider_config.port
     logging_config = _apply_logging_overrides(
         LoggingConfig(file_path=local_config.log_path),
         console_log_level=console_log_level,
@@ -854,28 +833,29 @@ def local_translation_serve(
         "local-translation serve started: config=%s config_exists=%s host=%s port=%s",
         resolved_config_path,
         config_exists,
-        host,
-        port,
+        resolved_host,
+        resolved_port,
     )
 
     if config_exists:
-        typer.echo(f"Local translation config: {resolved_config_path}")
+        typer.echo(f"App config: {resolved_config_path}")
     else:
         typer.echo(
-            "[warn] local translation config missing: "
-            f"{resolved_config_path} (serve used built-in defaults)"
+            f"[warn] config missing: {resolved_config_path} (local-translation serve used built-in defaults)"
         )
     typer.echo(f"Local translation model: {local_config.model}")
     typer.echo(f"Local translation device policy: {local_config.device}")
     typer.echo(f"Local translation dtype policy: {local_config.dtype}")
-    typer.echo(f"Starting local TranslateGemma sidecar on ws://{host}:{port}")
+    typer.echo(
+        f"Starting local TranslateGemma sidecar on ws://{resolved_host}:{resolved_port}"
+    )
 
     try:
         asyncio.run(
             run_translategemma_local_server(
                 config=local_config,
-                host=host,
-                port=port,
+                host=resolved_host,
+                port=resolved_port,
                 logger=root_logger.getChild("local_translation.translategemma"),
             )
         )

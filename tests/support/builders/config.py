@@ -7,6 +7,7 @@ from vrc_live_caption.config import (
     CaptureConfig,
     DebugConfig,
     FunasrLocalProviderConfig,
+    FunasrLocalSidecarConfig,
     GoogleCloudTranslationProviderConfig,
     IflytekRtasrProviderConfig,
     LoggingConfig,
@@ -17,6 +18,7 @@ from vrc_live_caption.config import (
     SttConfig,
     SttProvidersConfig,
     SttRetryConfig,
+    TranslateGemmaLocalSidecarConfig,
     TranslateGemmaLocalTranslationProviderConfig,
     TranslationConfig,
     TranslationProvidersConfig,
@@ -61,7 +63,9 @@ def build_config(tmp_path: Path, **capture_overrides: object) -> AppConfig:
             provider="iflytek_rtasr",
             retry=SttRetryConfig(),
             providers=SttProvidersConfig(
-                funasr_local=FunasrLocalProviderConfig(),
+                funasr_local=FunasrLocalProviderConfig(
+                    sidecar=FunasrLocalSidecarConfig()
+                ),
                 iflytek_rtasr=IflytekRtasrProviderConfig(),
                 openai_realtime=OpenAIRealtimeProviderConfig(),
             ),
@@ -70,7 +74,9 @@ def build_config(tmp_path: Path, **capture_overrides: object) -> AppConfig:
             enabled=False,
             providers=TranslationProvidersConfig(
                 google_cloud=GoogleCloudTranslationProviderConfig(),
-                translategemma_local=TranslateGemmaLocalTranslationProviderConfig(),
+                translategemma_local=TranslateGemmaLocalTranslationProviderConfig(
+                    sidecar=TranslateGemmaLocalSidecarConfig()
+                ),
             ),
         ),
     )
@@ -88,12 +94,14 @@ def write_test_config(
     stt_overrides: Mapping[str, object] | None = None,
     stt_retry_overrides: Mapping[str, object] | None = None,
     funasr_local_overrides: Mapping[str, object] | None = None,
+    funasr_local_sidecar_overrides: Mapping[str, object] | None = None,
     iflytek_rtasr_overrides: Mapping[str, object] | None = None,
     openai_realtime_overrides: Mapping[str, object] | None = None,
     translation_overrides: Mapping[str, object] | None = None,
     translation_chatbox_layout_overrides: Mapping[str, object] | None = None,
     google_cloud_translation_overrides: Mapping[str, object] | None = None,
     translategemma_local_translation_overrides: Mapping[str, object] | None = None,
+    translategemma_local_sidecar_overrides: Mapping[str, object] | None = None,
 ) -> Path:
     capture_values: dict[str, object] = {
         "sample_rate": 16_000,
@@ -140,6 +148,22 @@ def write_test_config(
         "port": 10095,
         "use_ssl": False,
     }
+    funasr_local_sidecar_values: dict[str, object] = {
+        "mode": "2pass",
+        "device": "auto",
+        "ncpu": 4,
+        "offline_asr_model": "paraformer-zh",
+        "online_asr_model": "paraformer-zh-streaming",
+        "vad_model": "fsmn-vad",
+        "punc_model": "ct-punc",
+        "chunk_size": [0, 10, 5],
+        "chunk_interval": 10,
+        "encoder_chunk_look_back": 4,
+        "decoder_chunk_look_back": 1,
+        "log_path": (
+            path.parent / ".runtime" / "logs" / "local-stt-funasr.log"
+        ).as_posix(),
+    }
     openai_realtime_values: dict[str, object] = {
         "model": "gpt-4o-transcribe",
         "noise_reduction": "near_field",
@@ -170,6 +194,15 @@ def write_test_config(
         "port": 10096,
         "use_ssl": False,
     }
+    translategemma_local_sidecar_values: dict[str, object] = {
+        "model": "google/translategemma-4b-it",
+        "device": "auto",
+        "dtype": "auto",
+        "max_new_tokens": 256,
+        "log_path": (
+            path.parent / ".runtime" / "logs" / "local-translation-translategemma.log"
+        ).as_posix(),
+    }
 
     capture_values.update(audio_overrides or {})
     capture_values.update(capture_overrides or {})
@@ -194,6 +227,7 @@ def write_test_config(
     if "max_backoff_seconds" in stt_values:
         stt_retry_values["max_backoff_seconds"] = stt_values.pop("max_backoff_seconds")
     funasr_local_values.update(funasr_local_overrides or {})
+    funasr_local_sidecar_values.update(funasr_local_sidecar_overrides or {})
     iflytek_rtasr_values.update(iflytek_rtasr_overrides or {})
     openai_realtime_values.update(openai_realtime_overrides or {})
     translation_values.update(translation_overrides or {})
@@ -201,6 +235,9 @@ def write_test_config(
     google_cloud_translation_values.update(google_cloud_translation_overrides or {})
     translategemma_local_translation_values.update(
         translategemma_local_translation_overrides or {}
+    )
+    translategemma_local_sidecar_values.update(
+        translategemma_local_sidecar_overrides or {}
     )
 
     sections = [
@@ -212,6 +249,7 @@ def write_test_config(
         ("stt", stt_values),
         ("stt.retry", stt_retry_values),
         ("stt.providers.funasr_local", funasr_local_values),
+        ("stt.providers.funasr_local.sidecar", funasr_local_sidecar_values),
         ("stt.providers.iflytek_rtasr", iflytek_rtasr_values),
         ("stt.providers.openai_realtime", openai_realtime_values),
         ("translation", translation_values),
@@ -223,6 +261,10 @@ def write_test_config(
         (
             "translation.providers.translategemma_local",
             translategemma_local_translation_values,
+        ),
+        (
+            "translation.providers.translategemma_local.sidecar",
+            translategemma_local_sidecar_values,
         ),
     ]
     lines: list[str] = []
@@ -245,6 +287,8 @@ def _toml_literal(value: object) -> str:
         return json.dumps(value)
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_toml_literal(item) for item in value) + "]"
     if isinstance(value, (int, float)):
         return repr(value)
     raise TypeError(f"Unsupported TOML literal type: {type(value).__name__}")

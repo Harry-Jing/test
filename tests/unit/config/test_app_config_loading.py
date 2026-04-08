@@ -21,6 +21,8 @@ class TestAppConfigLoading:
         assert config.stt.provider == "openai_realtime"
         assert config.stt.providers.funasr_local.host == "127.0.0.1"
         assert config.stt.providers.funasr_local.port == 10095
+        assert config.stt.providers.funasr_local.sidecar.device == "auto"
+        assert config.stt.providers.funasr_local.sidecar.chunk_size == (0, 10, 5)
         assert config.stt.providers.iflytek_rtasr.language == "autodialect"
         assert config.stt.providers.iflytek_rtasr.vad_mode == "near_field"
         assert config.stt.providers.openai_realtime.model == "gpt-4o-transcribe"
@@ -33,6 +35,11 @@ class TestAppConfigLoading:
         assert config.translation.chatbox_layout.target_visible_lines == 4
         assert config.translation.providers.translategemma_local.host == "127.0.0.1"
         assert config.translation.providers.translategemma_local.port == 10096
+        assert (
+            config.translation.providers.translategemma_local.sidecar.model
+            == "google/translategemma-4b-it"
+        )
+        assert config.translation.providers.translategemma_local.sidecar.dtype == "auto"
 
     def test_when_config_file_contains_custom_values__then_it_parses_them(
         self,
@@ -84,6 +91,19 @@ class TestAppConfigLoading:
                     "port = 10096",
                     "use_ssl = false",
                     "",
+                    "[stt.providers.funasr_local.sidecar]",
+                    'device = "cpu"',
+                    "ncpu = 2",
+                    'offline_asr_model = "custom-offline"',
+                    'online_asr_model = "custom-online"',
+                    'vad_model = "custom-vad"',
+                    'punc_model = "custom-punc"',
+                    "chunk_size = [0, 8, 4]",
+                    "chunk_interval = 8",
+                    "encoder_chunk_look_back = 3",
+                    "decoder_chunk_look_back = 2",
+                    'log_path = ".runtime/logs/local-stt-custom.log"',
+                    "",
                     "[stt.providers.iflytek_rtasr]",
                     'language = "autominor"',
                     'vad_mode = "far_field"',
@@ -123,6 +143,13 @@ class TestAppConfigLoading:
                     'host = "127.0.0.1"',
                     "port = 11096",
                     "use_ssl = true",
+                    "",
+                    "[translation.providers.translategemma_local.sidecar]",
+                    'model = "custom/translategemma"',
+                    'device = "cpu"',
+                    'dtype = "float32"',
+                    "max_new_tokens = 128",
+                    'log_path = ".runtime/logs/local-translation-custom.log"',
                 ]
             ),
             encoding="utf-8",
@@ -143,6 +170,9 @@ class TestAppConfigLoading:
         assert config.stt.retry.connect_timeout_seconds == 12.5
         assert config.stt.retry.max_attempts == 4
         assert config.stt.providers.funasr_local.port == 10096
+        assert config.stt.providers.funasr_local.sidecar.device == "cpu"
+        assert config.stt.providers.funasr_local.sidecar.ncpu == 2
+        assert config.stt.providers.funasr_local.sidecar.chunk_size == (0, 8, 4)
         assert config.stt.providers.iflytek_rtasr.language == "autominor"
         assert config.stt.providers.iflytek_rtasr.vad_mode == "far_field"
         assert config.stt.providers.iflytek_rtasr.domain == "tech"
@@ -156,6 +186,23 @@ class TestAppConfigLoading:
         assert config.translation.providers.google_cloud.project_id == "test-project"
         assert config.translation.providers.translategemma_local.port == 11096
         assert config.translation.providers.translategemma_local.use_ssl is True
+        assert (
+            config.translation.providers.translategemma_local.sidecar.model
+            == "custom/translategemma"
+        )
+        assert (
+            config.translation.providers.translategemma_local.sidecar.dtype == "float32"
+        )
+
+    def test_when_example_config_is_loaded__then_it_parses_as_the_single_source_of_truth(
+        self,
+    ) -> None:
+        config = AppConfig.from_toml_file(Path("vrc-live-caption.toml.example"))
+
+        assert config.stt.providers.funasr_local.sidecar.device == "auto"
+        assert config.translation.providers.translategemma_local.sidecar.model == (
+            "google/translategemma-4b-it"
+        )
 
 
 class TestParseDeviceValue:

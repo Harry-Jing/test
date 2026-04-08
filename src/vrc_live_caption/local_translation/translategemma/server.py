@@ -170,7 +170,7 @@ def resolve_translategemma_runtime(
     elif device_policy == "cuda":
         if not cuda_available:
             raise TranslationError(
-                'local-translation-translategemma.toml requests device = "cuda", '
+                '[translation.providers.translategemma_local.sidecar] requests device = "cuda", '
                 "but torch.cuda.is_available() is false. Install the translategemma-cu128 extra "
                 "and verify the Windows NVIDIA CUDA runtime."
             )

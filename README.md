@@ -32,15 +32,18 @@ uv run vrc-live-caption run
 
 Set `OPENAI_API_KEY` in `.env` before `doctor` or `run`.
 
+Ordinary configuration lives in one file: `vrc-live-caption.toml`. See [docs/configuration.md](./docs/configuration.md) for scenario-based setup, including local FunASR and local TranslateGemma sidecars.
+
 ## Common Commands
 
 ```shell
 uv run vrc-live-caption devices
 uv run vrc-live-caption doctor
+uv run vrc-live-caption local-stt serve
 uv run vrc-live-caption local-translation serve
 uv run vrc-live-caption osc-test "OSC test"
 uv run vrc-live-caption record-sample --seconds 10
 uv run vrc-live-caption run
 ```
 
-OpenAI is the default backend. To use iFLYTEK instead, switch `[stt].provider` in `vrc-live-caption.toml` and set the required `IFLYTEK_*` secrets in `.env`.
+OpenAI is the default backend. To use iFLYTEK, FunASR, DeepL, Google Cloud, or TranslateGemma instead, keep using the same `vrc-live-caption.toml` file and follow [docs/configuration.md](./docs/configuration.md).

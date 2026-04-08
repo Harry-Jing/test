@@ -1,9 +1,6 @@
 """Expose the local TranslateGemma sidecar config and server entrypoints."""
 
-from .config import (
-    DEFAULT_LOCAL_TRANSLATION_CONFIG_PATH,
-    TranslateGemmaLocalServiceConfig,
-)
+from .config import TranslateGemmaLocalServiceConfig
 from .server import (
     ResolvedTranslateGemmaRuntime,
     TranslateGemmaModelBundle,
@@ -12,7 +9,6 @@ from .server import (
 )
 
 __all__ = [
-    "DEFAULT_LOCAL_TRANSLATION_CONFIG_PATH",
     "ResolvedTranslateGemmaRuntime",
     "TranslateGemmaLocalServiceConfig",
     "TranslateGemmaModelBundle",

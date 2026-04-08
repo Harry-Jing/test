@@ -1,18 +1,18 @@
 from pathlib import Path
+from typing import Any
 
 from vrc_live_caption.cli import app
-from vrc_live_caption.config import ConfigError
 from vrc_live_caption.errors import TranslationError
 
 
 class TestLocalTranslationServeCommand:
-    def test_when_local_sidecar_starts__then_it_uses_the_requested_host_and_port(
+    def test_when_local_sidecar_starts__then_it_reads_runtime_settings_from_app_config(
         self,
         monkeypatch,
-        tmp_cwd: Path,
+        config_file_factory,
         cli_runner,
     ) -> None:
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         async def fake_run_translategemma_local_server(
             *, config, host, port, logger
@@ -25,39 +25,62 @@ class TestLocalTranslationServeCommand:
             "vrc_live_caption.cli.run_translategemma_local_server",
             fake_run_translategemma_local_server,
         )
+        config_path = config_file_factory(
+            translategemma_local_translation_overrides={
+                "host": "127.0.0.2",
+                "port": 11096,
+            },
+            translategemma_local_sidecar_overrides={
+                "model": "custom/translategemma",
+                "device": "cpu",
+                "dtype": "float32",
+            },
+        )
 
         result = cli_runner.invoke(
             app,
-            ["local-translation", "serve", "--host", "127.0.0.1", "--port", "10096"],
+            ["local-translation", "serve", "--config", str(config_path)],
         )
 
         assert result.exit_code == 0
-        assert captured["host"] == "127.0.0.1"
-        assert captured["port"] == 10096
-        assert "Local translation model: google/translategemma-4b-it" in result.output
-        assert "Local translation device policy: auto" in result.output
-        assert "Local translation dtype policy: auto" in result.output
+        assert captured["host"] == "127.0.0.2"
+        assert captured["port"] == 11096
+        assert captured["config"].model == "custom/translategemma"
+        assert f"App config: {config_path}" in result.output
+        assert "Local translation model: custom/translategemma" in result.output
+        assert "Local translation device policy: cpu" in result.output
+        assert "Local translation dtype policy: float32" in result.output
         assert (
-            "Starting local TranslateGemma sidecar on ws://127.0.0.1:10096"
+            "Starting local TranslateGemma sidecar on ws://127.0.0.2:11096"
             in result.output
         )
 
-    def test_when_local_config_is_invalid__then_it_exits_non_zero(
+    def test_when_app_config_is_invalid__then_it_exits_non_zero(
         self,
-        monkeypatch,
+        tmp_path: Path,
         cli_runner,
     ) -> None:
-        monkeypatch.setattr(
-            "vrc_live_caption.cli._load_optional_local_translation_config",
-            lambda config: (_ for _ in ()).throw(
-                ConfigError("bad local translation config")
+        config_path = tmp_path / "bad-local-translation.toml"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "[translation.providers.translategemma_local.sidecar]",
+                    'dtype = "float16"',
+                ]
             ),
+            encoding="utf-8",
         )
 
-        result = cli_runner.invoke(app, ["local-translation", "serve"])
+        result = cli_runner.invoke(
+            app,
+            ["local-translation", "serve", "--config", str(config_path)],
+        )
 
         assert result.exit_code == 1
-        assert "bad local translation config" in result.output
+        assert (
+            "translation.providers.translategemma_local.sidecar.dtype must be one of: auto, bfloat16, float32"
+            in result.output
+        )
 
     def test_when_runtime_raises_vrc_error__then_it_exits_non_zero(
         self,

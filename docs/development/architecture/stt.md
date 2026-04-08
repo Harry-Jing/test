@@ -79,8 +79,8 @@ This document records the current STT contract.
 
 - `FunasrLocalBackend` validates capture shape for `16000 Hz`, mono, `int16` audio.
 - The backend connects to a repository-local websocket sidecar started by `vrc-live-caption local-stt serve`.
-- Main-app config only stores sidecar connection settings under `[stt.providers.funasr_local]`.
-- Model selection, device policy, chunking, VAD, punctuation, and runtime thread settings live in `local-stt-funasr.toml`.
+- Main-app config stores sidecar connection settings under `[stt.providers.funasr_local]`.
+- Model selection, device policy, chunking, VAD, punctuation, and runtime thread settings live under `[stt.providers.funasr_local.sidecar]`.
 - Each attempt creates a fresh `FunasrLocalConnectionState`.
 - Attempt-scoped state includes:
   - segment-to-revision tracking for normalized utterances

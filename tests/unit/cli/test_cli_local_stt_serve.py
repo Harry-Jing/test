@@ -1,18 +1,18 @@
 from pathlib import Path
+from typing import Any
 
 from vrc_live_caption.cli import app
-from vrc_live_caption.config import ConfigError
 from vrc_live_caption.errors import AudioRuntimeError
 
 
 class TestLocalSttServeCommand:
-    def test_when_local_sidecar_starts__then_it_uses_the_requested_host_and_port(
+    def test_when_local_sidecar_starts__then_it_reads_runtime_settings_from_app_config(
         self,
         monkeypatch,
-        tmp_cwd: Path,
+        config_file_factory,
         cli_runner,
     ) -> None:
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         async def fake_run_funasr_local_server(*, config, host, port, logger) -> None:
             captured["config"] = config
@@ -23,32 +23,50 @@ class TestLocalSttServeCommand:
             "vrc_live_caption.cli.run_funasr_local_server",
             fake_run_funasr_local_server,
         )
+        config_path = config_file_factory(
+            funasr_local_overrides={"host": "127.0.0.2", "port": 11095},
+            funasr_local_sidecar_overrides={"device": "cpu"},
+        )
 
         result = cli_runner.invoke(
             app,
-            ["local-stt", "serve", "--host", "127.0.0.1", "--port", "10095"],
+            ["local-stt", "serve", "--config", str(config_path)],
         )
 
         assert result.exit_code == 0
-        assert captured["host"] == "127.0.0.1"
-        assert captured["port"] == 10095
-        assert "Local STT device policy: auto" in result.output
-        assert "Starting local FunASR sidecar on ws://127.0.0.1:10095" in result.output
+        assert captured["host"] == "127.0.0.2"
+        assert captured["port"] == 11095
+        assert captured["config"].device == "cpu"
+        assert f"App config: {config_path}" in result.output
+        assert "Local STT device policy: cpu" in result.output
+        assert "Starting local FunASR sidecar on ws://127.0.0.2:11095" in result.output
 
-    def test_when_local_config_is_invalid__then_it_exits_non_zero(
+    def test_when_app_config_is_invalid__then_it_exits_non_zero(
         self,
-        monkeypatch,
+        tmp_path: Path,
         cli_runner,
     ) -> None:
-        monkeypatch.setattr(
-            "vrc_live_caption.cli._load_optional_local_stt_config",
-            lambda config: (_ for _ in ()).throw(ConfigError("bad local stt config")),
+        config_path = tmp_path / "bad-local-stt.toml"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "[stt.providers.funasr_local.sidecar]",
+                    'device = "metal"',
+                ]
+            ),
+            encoding="utf-8",
         )
 
-        result = cli_runner.invoke(app, ["local-stt", "serve"])
+        result = cli_runner.invoke(
+            app,
+            ["local-stt", "serve", "--config", str(config_path)],
+        )
 
         assert result.exit_code == 1
-        assert "bad local stt config" in result.output
+        assert (
+            "stt.providers.funasr_local.sidecar.device must be one of: auto, cpu, cuda"
+            in result.output
+        )
 
     def test_when_runtime_raises_vrc_error__then_it_exits_non_zero(
         self,

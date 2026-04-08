@@ -31,6 +31,10 @@ class TestAppConfigModelDefaults:
         assert first.retry is not second.retry
         assert first.providers is not second.providers
         assert first.providers.funasr_local is not second.providers.funasr_local
+        assert (
+            first.providers.funasr_local.sidecar
+            is not second.providers.funasr_local.sidecar
+        )
         assert first.providers.iflytek_rtasr is not second.providers.iflytek_rtasr
         assert first.providers.openai_realtime is not second.providers.openai_realtime
 
@@ -60,3 +64,5 @@ class TestTranslationConfigModels:
         assert config.host == "127.0.0.1"
         assert config.port == 10096
         assert config.use_ssl is False
+        assert config.sidecar.model == "google/translategemma-4b-it"
+        assert config.sidecar.dtype == "auto"

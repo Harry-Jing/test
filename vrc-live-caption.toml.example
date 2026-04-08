@@ -1,4 +1,20 @@
+# VRC Live Caption configuration
+#
+# This is the only ordinary config file.
+# Secrets stay in `.env`.
+#
+# Start here:
+# 1. Copy this file to `vrc-live-caption.toml`
+# 2. Put required secrets in `.env`
+# 3. Run `uv run vrc-live-caption doctor`
+#
+# Minimal setup:
+# - Captions only with OpenAI STT: leave most values as-is and set `OPENAI_API_KEY`
+# - Translation: set `[translation].enabled = true`, choose a provider, and set `target_language`
+# - Local FunASR / TranslateGemma: keep using this same file; edit the `.sidecar` blocks below
+
 [capture]
+# Usually you do not need to change this block.
 device = "default"
 sample_rate = 16000
 channels = 1
@@ -6,12 +22,14 @@ dtype = "int16"
 block_duration_ms = 100
 
 [pipeline]
+# Internal queue and shutdown tuning. Usually leave at defaults.
 audio_buffer_max_chunks = 50
 event_buffer_max_items = 200
 shutdown_timeout_seconds = 5.0
 heartbeat_seconds = 5
 
 [logging]
+# Application log for `doctor`, `run`, and other normal CLI commands.
 console_level = "WARNING"
 file_level = "INFO"
 file_path = ".runtime/logs/vrc-live-caption.log"
@@ -19,34 +37,31 @@ max_bytes = 1048576
 backup_count = 3
 
 [debug]
+# Runtime artifact directories. Usually leave at defaults.
 runtime_dir = ".runtime"
 recordings_dir = ".runtime/recordings"
 probe_seconds = 0.25
 
 [osc]
+# VRChat Chatbox OSC target.
 host = "127.0.0.1"
 port = 9000
 notification_sfx = false
 
 [stt]
+# Choose one: `openai_realtime`, `iflytek_rtasr`, or `funasr_local`.
+# OpenAI is the default and only needs `OPENAI_API_KEY` in `.env`.
 provider = "openai_realtime"
 
 [stt.retry]
+# Shared reconnect policy for STT backends.
 connect_timeout_seconds = 10.0
 max_attempts = 3
 initial_backoff_seconds = 1.0
 max_backoff_seconds = 5.0
 
-[stt.providers.iflytek_rtasr]
-language = "autodialect"
-vad_mode = "near_field"
-
-[stt.providers.funasr_local]
-host = "127.0.0.1"
-port = 10095
-use_ssl = false
-
 [stt.providers.openai_realtime]
+# Only change this block when you are using the default OpenAI STT backend.
 model = "gpt-4o-transcribe"
 language = "zh"
 prompt = "Expect conversational Mandarin Chinese with occasional English technical terms."
@@ -56,27 +71,74 @@ vad_prefix_padding_ms = 300
 vad_silence_duration_ms = 500
 vad_threshold = 0.5
 
+[stt.providers.iflytek_rtasr]
+# Only change this block when `stt.provider = "iflytek_rtasr"`.
+language = "autodialect"
+vad_mode = "near_field"
+# domain = "iat"
+
+[stt.providers.funasr_local]
+# Only change this block when `stt.provider = "funasr_local"`.
+# `doctor` and `run` connect to this websocket sidecar address.
+host = "127.0.0.1"
+port = 10095
+use_ssl = false
+
+[stt.providers.funasr_local.sidecar]
+# Only change this block when you run `uv run vrc-live-caption local-stt serve`.
+# Usually you can leave these values alone.
+mode = "2pass"
+device = "auto"
+ncpu = 4
+offline_asr_model = "paraformer-zh"
+online_asr_model = "paraformer-zh-streaming"
+vad_model = "fsmn-vad"
+punc_model = "ct-punc"
+chunk_size = [0, 10, 5]
+chunk_interval = 10
+encoder_chunk_look_back = 4
+decoder_chunk_look_back = 1
+log_path = ".runtime/logs/local-stt-funasr.log"
+
 [translation]
+# Turn translation on only when you want bilingual or translated output.
 enabled = false
+# Choose one: `deepl`, `google_cloud`, or `translategemma_local`.
 provider = "deepl"
 target_language = "en"
+# Required when `translation.provider = "translategemma_local"`.
 source_language = "zh"
+# `source`, `target`, or `source_target`.
 output_mode = "source_target"
 strategy = "final_only"
 request_timeout_seconds = 3.0
 max_pending_finals = 8
 
 [translation.chatbox_layout]
+# Only affects stacked bilingual output.
 mode = "stacked_two_zone"
 source_visible_lines = 4
 separator_blank_lines = 1
 target_visible_lines = 4
 
 [translation.providers.google_cloud]
+# Only change this block when `translation.provider = "google_cloud"`.
+# Also configure ADC and put your project id here.
 project_id = "replace-me"
 location = "global"
 
 [translation.providers.translategemma_local]
+# Only change this block when `translation.provider = "translategemma_local"`.
+# `doctor` and `run` connect to this websocket sidecar address.
 host = "127.0.0.1"
 port = 10096
 use_ssl = false
+
+[translation.providers.translategemma_local.sidecar]
+# Only change this block when you run `uv run vrc-live-caption local-translation serve`.
+# Usually you can leave these values alone unless you want a different local model.
+model = "google/translategemma-4b-it"
+device = "auto"
+dtype = "auto"
+max_new_tokens = 256
+log_path = ".runtime/logs/local-translation-translategemma.log"

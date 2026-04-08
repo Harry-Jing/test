@@ -412,12 +412,130 @@ class IflytekRtasrProviderConfig(_ConfigModel):
         return _coerce_optional_str(value, "stt.providers.iflytek_rtasr.domain")
 
 
+class FunasrLocalSidecarConfig(_ConfigModel):
+    """Store local FunASR sidecar runtime models and inference settings."""
+
+    mode: str = "2pass"
+    device: str = "auto"
+    ncpu: int = 4
+    offline_asr_model: str = "paraformer-zh"
+    online_asr_model: str = "paraformer-zh-streaming"
+    vad_model: str = "fsmn-vad"
+    punc_model: str = "ct-punc"
+    chunk_size: tuple[int, int, int] = (0, 10, 5)
+    chunk_interval: int = 10
+    encoder_chunk_look_back: int = 4
+    decoder_chunk_look_back: int = 1
+    log_path: Path = Path(".runtime/logs/local-stt-funasr.log")
+
+    @property
+    def online_window_ms(self) -> int:
+        """Return the online inference window size in milliseconds."""
+        return self.chunk_size[1] * 60
+
+    @property
+    def packet_duration_ms(self) -> int:
+        """Return the internal packet duration used by VAD and streaming ASR."""
+        return int(self.online_window_ms / self.chunk_interval)
+
+    @property
+    def chunk_size_list(self) -> list[int]:
+        """Return the chunk size in the list form expected by FunASR."""
+        return list(self.chunk_size)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _validate_mode(cls, value: Any) -> str:
+        result = _coerce_str(value, "stt.providers.funasr_local.sidecar.mode")
+        if result != "2pass":
+            raise ValueError("stt.providers.funasr_local.sidecar.mode must be 2pass")
+        return result
+
+    @field_validator("device", mode="before")
+    @classmethod
+    def _validate_device(cls, value: Any) -> str:
+        result = _coerce_str(value, "stt.providers.funasr_local.sidecar.device")
+        if result not in {"auto", "cpu", "cuda"}:
+            raise ValueError(
+                "stt.providers.funasr_local.sidecar.device must be one of: auto, cpu, cuda"
+            )
+        return result
+
+    @field_validator(
+        "offline_asr_model", "online_asr_model", "vad_model", mode="before"
+    )
+    @classmethod
+    def _validate_model_strings(cls, value: Any, info: ValidationInfo) -> str:
+        field_name = info.field_name or "model"
+        return _coerce_str(value, f"stt.providers.funasr_local.sidecar.{field_name}")
+
+    @field_validator(
+        "encoder_chunk_look_back",
+        "decoder_chunk_look_back",
+        mode="before",
+    )
+    @classmethod
+    def _validate_int_fields(cls, value: Any, info: ValidationInfo) -> int:
+        field_name = info.field_name or "int_field"
+        return _coerce_int(
+            value,
+            f"stt.providers.funasr_local.sidecar.{field_name}",
+            minimum=0,
+        )
+
+    @field_validator("log_path", mode="before")
+    @classmethod
+    def _validate_log_path(cls, value: Any) -> Path:
+        return _coerce_path(value, "stt.providers.funasr_local.sidecar.log_path")
+
+    @field_validator("chunk_size", mode="before")
+    @classmethod
+    def _validate_chunk_size(cls, value: Any) -> tuple[int, int, int]:
+        context = "stt.providers.funasr_local.sidecar.chunk_size"
+        if not isinstance(value, (list, tuple)):
+            raise ValueError(f"{context} must be an array of 3 integers")
+        if len(value) != 3:
+            raise ValueError(f"{context} must contain exactly 3 integers")
+        result = (
+            _coerce_int(value[0], context, minimum=0),
+            _coerce_int(value[1], context, minimum=0),
+            _coerce_int(value[2], context, minimum=0),
+        )
+        if result[1] < 1:
+            raise ValueError(f"{context}[1] must be >= 1")
+        return result
+
+    @field_validator("punc_model", mode="before")
+    @classmethod
+    def _validate_punc_model(cls, value: Any) -> str:
+        return _coerce_str(value, "stt.providers.funasr_local.sidecar.punc_model")
+
+    @field_validator("ncpu", mode="before")
+    @classmethod
+    def _validate_ncpu(cls, value: Any) -> int:
+        return _coerce_int(
+            value,
+            "stt.providers.funasr_local.sidecar.ncpu",
+            minimum=1,
+        )
+
+    @field_validator("chunk_interval", mode="before")
+    @classmethod
+    def _validate_chunk_interval(cls, value: Any) -> int:
+        return _coerce_int(
+            value,
+            "stt.providers.funasr_local.sidecar.chunk_interval",
+            minimum=1,
+        )
+
+
 class FunasrLocalProviderConfig(_ConfigModel):
     """Store local FunASR sidecar connection settings."""
 
     host: str = "127.0.0.1"
     port: int = 10095
     use_ssl: bool = False
+    sidecar: FunasrLocalSidecarConfig = Field(default_factory=FunasrLocalSidecarConfig)
 
     @field_validator("host", mode="before")
     @classmethod
@@ -534,12 +652,72 @@ class GoogleCloudTranslationProviderConfig(_ConfigModel):
         return _coerce_str(value, "translation.providers.google_cloud.location")
 
 
+class TranslateGemmaLocalSidecarConfig(_ConfigModel):
+    """Store local TranslateGemma sidecar runtime model and inference settings."""
+
+    model: str = "google/translategemma-4b-it"
+    device: str = "auto"
+    dtype: str = "auto"
+    max_new_tokens: int = 256
+    log_path: Path = Path(".runtime/logs/local-translation-translategemma.log")
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def _validate_model(cls, value: Any) -> str:
+        return _coerce_str(
+            value, "translation.providers.translategemma_local.sidecar.model"
+        )
+
+    @field_validator("device", mode="before")
+    @classmethod
+    def _validate_device(cls, value: Any) -> str:
+        result = _coerce_str(
+            value, "translation.providers.translategemma_local.sidecar.device"
+        )
+        if result not in {"auto", "cpu", "cuda"}:
+            raise ValueError(
+                "translation.providers.translategemma_local.sidecar.device must be one of: auto, cpu, cuda"
+            )
+        return result
+
+    @field_validator("dtype", mode="before")
+    @classmethod
+    def _validate_dtype(cls, value: Any) -> str:
+        result = _coerce_str(
+            value, "translation.providers.translategemma_local.sidecar.dtype"
+        )
+        if result not in {"auto", "bfloat16", "float32"}:
+            raise ValueError(
+                "translation.providers.translategemma_local.sidecar.dtype must be one of: auto, bfloat16, float32"
+            )
+        return result
+
+    @field_validator("max_new_tokens", mode="before")
+    @classmethod
+    def _validate_max_new_tokens(cls, value: Any) -> int:
+        return _coerce_int(
+            value,
+            "translation.providers.translategemma_local.sidecar.max_new_tokens",
+            minimum=1,
+        )
+
+    @field_validator("log_path", mode="before")
+    @classmethod
+    def _validate_log_path(cls, value: Any) -> Path:
+        return _coerce_path(
+            value, "translation.providers.translategemma_local.sidecar.log_path"
+        )
+
+
 class TranslateGemmaLocalTranslationProviderConfig(_ConfigModel):
     """Store local TranslateGemma sidecar connection settings."""
 
     host: str = "127.0.0.1"
     port: int = 10096
     use_ssl: bool = False
+    sidecar: TranslateGemmaLocalSidecarConfig = Field(
+        default_factory=TranslateGemmaLocalSidecarConfig
+    )
 
     @field_validator("host", mode="before")
     @classmethod
@@ -789,6 +967,7 @@ __all__ = [
     "CaptureConfig",
     "ConfigError",
     "DebugConfig",
+    "FunasrLocalSidecarConfig",
     "FunasrLocalProviderConfig",
     "IflytekRtasrProviderConfig",
     "LogLevel",
@@ -797,6 +976,7 @@ __all__ = [
     "OscConfig",
     "PipelineConfig",
     "GoogleCloudTranslationProviderConfig",
+    "TranslateGemmaLocalSidecarConfig",
     "TranslateGemmaLocalTranslationProviderConfig",
     "SttConfig",
     "SttProvidersConfig",

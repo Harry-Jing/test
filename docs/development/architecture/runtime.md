@@ -20,6 +20,8 @@ This document records the current runtime contract for the async capture-to-capt
 
 - The default runtime config file is `vrc-live-caption.toml` in the repository root.
 - The tracked template is `vrc-live-caption.toml.example`; the live config stays untracked.
+- `vrc-live-caption.toml` is the only ordinary config file; `.env` remains secrets-only.
+- Local sidecar runtime settings are embedded in the main config rather than split into separate TOML files.
 - Capture defaults are:
   - Sample rate: `16000`
   - Channels: `1`

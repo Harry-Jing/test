@@ -128,12 +128,12 @@ uv run vrc-live-caption run
 - Before `doctor` or `run`, ensure the credentials required by the selected `stt.provider` are available, or start `vrc-live-caption local-stt serve` when using `funasr_local`.
 - Before `doctor` or `run`, start `vrc-live-caption local-translation serve` when using `translation.provider = "translategemma_local"`.
 - `osc-test` does not require STT credentials.
-- `local-stt serve` uses `local-stt-funasr.toml` when present and otherwise falls back to built-in defaults.
-- `local-translation serve` uses `local-translation-translategemma.toml` when present and otherwise falls back to built-in defaults.
+- `local-stt serve` reads the main app config file and uses `[stt.providers.funasr_local]` plus `[stt.providers.funasr_local.sidecar]`.
+- `local-translation serve` reads the main app config file and uses `[translation.providers.translategemma_local]` plus `[translation.providers.translategemma_local.sidecar]`.
 - Install `uv sync --extra funasr-cpu` for CPU-only local STT validation, or `uv sync --extra funasr-cu128` on Windows/NVIDIA machines for GPU validation.
 - Install `uv sync --extra translategemma-cpu` for CPU-only local translation validation, or `uv sync --extra translategemma-cu128` on Windows/NVIDIA machines for GPU validation.
-- `local-stt-funasr.toml` now defaults to `device = "auto"`, which prefers `cuda:0` when `torch.cuda.is_available()` is true and otherwise falls back to `cpu`.
-- `local-translation-translategemma.toml` now defaults to `device = "auto"` and `dtype = "auto"`, which resolve to `cuda:0` plus `bfloat16` when `torch.cuda.is_available()` is true and otherwise fall back to `cpu` plus `float32`.
+- `[stt.providers.funasr_local.sidecar].device = "auto"` prefers `cuda:0` when `torch.cuda.is_available()` is true and otherwise falls back to `cpu`.
+- `[translation.providers.translategemma_local.sidecar].device = "auto"` and `dtype = "auto"` resolve to `cuda:0` plus `bfloat16` when `torch.cuda.is_available()` is true and otherwise fall back to `cpu` plus `float32`.
 
 ## Config Notes
 
@@ -141,6 +141,8 @@ uv run vrc-live-caption run
 - Pipeline queue and shutdown settings live under `[pipeline]`.
 - Retry policy lives under `[stt.retry]`.
 - Provider-specific blocks live under `[stt.providers.<provider>]`.
+- Local FunASR sidecar runtime settings live under `[stt.providers.funasr_local.sidecar]`.
 - Translation settings live under `[translation]`.
 - Google Cloud Translation provider settings live under `[translation.providers.google_cloud]`.
 - Local TranslateGemma translation sidecar connection settings live under `[translation.providers.translategemma_local]`.
+- Local TranslateGemma sidecar runtime settings live under `[translation.providers.translategemma_local.sidecar]`.

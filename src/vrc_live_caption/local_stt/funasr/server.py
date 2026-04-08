@@ -172,7 +172,7 @@ def resolve_funasr_runtime_device(
     if device_policy == "cuda":
         if not cuda_available:
             raise SttSessionError(
-                'local-stt-funasr.toml requests device = "cuda", but torch.cuda.is_available() is false. '
+                '[stt.providers.funasr_local.sidecar] requests device = "cuda", but torch.cuda.is_available() is false. '
                 "Install the funasr-cu128 extra and verify the Windows NVIDIA CUDA runtime."
             )
         return ResolvedFunasrDevice(
