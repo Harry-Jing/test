@@ -17,6 +17,7 @@ from vrc_live_caption.config import (
     SttConfig,
     SttProvidersConfig,
     SttRetryConfig,
+    TranslateGemmaLocalTranslationProviderConfig,
     TranslationConfig,
     TranslationProvidersConfig,
 )
@@ -68,7 +69,8 @@ def build_config(tmp_path: Path, **capture_overrides: object) -> AppConfig:
         translation=TranslationConfig(
             enabled=False,
             providers=TranslationProvidersConfig(
-                google_cloud=GoogleCloudTranslationProviderConfig()
+                google_cloud=GoogleCloudTranslationProviderConfig(),
+                translategemma_local=TranslateGemmaLocalTranslationProviderConfig(),
             ),
         ),
     )
@@ -91,6 +93,7 @@ def write_test_config(
     translation_overrides: Mapping[str, object] | None = None,
     translation_chatbox_layout_overrides: Mapping[str, object] | None = None,
     google_cloud_translation_overrides: Mapping[str, object] | None = None,
+    translategemma_local_translation_overrides: Mapping[str, object] | None = None,
 ) -> Path:
     capture_values: dict[str, object] = {
         "sample_rate": 16_000,
@@ -162,6 +165,11 @@ def write_test_config(
     google_cloud_translation_values: dict[str, object] = {
         "location": "global",
     }
+    translategemma_local_translation_values: dict[str, object] = {
+        "host": "127.0.0.1",
+        "port": 10096,
+        "use_ssl": False,
+    }
 
     capture_values.update(audio_overrides or {})
     capture_values.update(capture_overrides or {})
@@ -191,6 +199,9 @@ def write_test_config(
     translation_values.update(translation_overrides or {})
     translation_chatbox_layout_values.update(translation_chatbox_layout_overrides or {})
     google_cloud_translation_values.update(google_cloud_translation_overrides or {})
+    translategemma_local_translation_values.update(
+        translategemma_local_translation_overrides or {}
+    )
 
     sections = [
         ("capture", capture_values),
@@ -208,6 +219,10 @@ def write_test_config(
         (
             "translation.providers.google_cloud",
             google_cloud_translation_values,
+        ),
+        (
+            "translation.providers.translategemma_local",
+            translategemma_local_translation_values,
         ),
     ]
     lines: list[str] = []

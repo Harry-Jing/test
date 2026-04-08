@@ -75,3 +75,8 @@ target_visible_lines = 4
 [translation.providers.google_cloud]
 project_id = "replace-me"
 location = "global"
+
+[translation.providers.translategemma_local]
+host = "127.0.0.1"
+port = 10096
+use_ssl = false

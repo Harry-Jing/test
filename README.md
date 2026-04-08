@@ -9,7 +9,7 @@ It captures microphone speech, converts it into text, and sends live captions to
 - Real-time microphone -> cloud STT -> VRChat Chatbox captions
 - Default provider: `openai_realtime`
 - Optional provider: `iflytek_rtasr`
-- Translation is not part of the current CLI scope
+- Optional text translation providers: `deepl`, `google_cloud`, `translategemma_local`
 
 ## Requirements
 
@@ -37,6 +37,7 @@ Set `OPENAI_API_KEY` in `.env` before `doctor` or `run`.
 ```shell
 uv run vrc-live-caption devices
 uv run vrc-live-caption doctor
+uv run vrc-live-caption local-translation serve
 uv run vrc-live-caption osc-test "OSC test"
 uv run vrc-live-caption record-sample --seconds 10
 uv run vrc-live-caption run

@@ -38,6 +38,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
         translation_overrides: dict[str, Any] | None = None,
         translation_chatbox_layout_overrides: dict[str, Any] | None = None,
         google_cloud_translation_overrides: dict[str, Any] | None = None,
+        translategemma_local_translation_overrides: dict[str, Any] | None = None,
     ) -> Path:
         target = path or tmp_path / "app.toml"
         write_test_config(
@@ -56,6 +57,7 @@ def config_file_factory(tmp_path: Path) -> Callable[..., Path]:
             translation_overrides=translation_overrides,
             translation_chatbox_layout_overrides=translation_chatbox_layout_overrides,
             google_cloud_translation_overrides=google_cloud_translation_overrides,
+            translategemma_local_translation_overrides=translategemma_local_translation_overrides,
         )
         return target
 

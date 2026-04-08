@@ -19,7 +19,7 @@ from .errors import ConfigError
 
 DEFAULT_CONFIG_PATH = Path("vrc-live-caption.toml")
 _SUPPORTED_STT_PROVIDERS = {"funasr_local", "iflytek_rtasr", "openai_realtime"}
-_SUPPORTED_TRANSLATION_PROVIDERS = {"deepl", "google_cloud"}
+_SUPPORTED_TRANSLATION_PROVIDERS = {"deepl", "google_cloud", "translategemma_local"}
 _SUPPORTED_TRANSLATION_OUTPUT_MODES = {"source", "target", "source_target"}
 _SUPPORTED_TRANSLATION_STRATEGIES = {"final_only"}
 _SUPPORTED_TRANSLATION_CHATBOX_LAYOUT_MODES = {"stacked_two_zone"}
@@ -534,6 +534,44 @@ class GoogleCloudTranslationProviderConfig(_ConfigModel):
         return _coerce_str(value, "translation.providers.google_cloud.location")
 
 
+class TranslateGemmaLocalTranslationProviderConfig(_ConfigModel):
+    """Store local TranslateGemma sidecar connection settings."""
+
+    host: str = "127.0.0.1"
+    port: int = 10096
+    use_ssl: bool = False
+
+    @field_validator("host", mode="before")
+    @classmethod
+    def _validate_host(cls, value: Any) -> str:
+        return _coerce_str(value, "translation.providers.translategemma_local.host")
+
+    @field_validator("port", mode="before")
+    @classmethod
+    def _validate_port(cls, value: Any) -> int:
+        return _coerce_int(
+            value,
+            "translation.providers.translategemma_local.port",
+            minimum=1,
+        )
+
+    @field_validator("use_ssl", mode="before")
+    @classmethod
+    def _validate_use_ssl(cls, value: Any) -> bool:
+        return _coerce_bool(
+            value,
+            "translation.providers.translategemma_local.use_ssl",
+        )
+
+    @model_validator(mode="after")
+    def _validate_ranges(self) -> Self:
+        if self.port > 65_535:
+            raise ValueError(
+                "translation.providers.translategemma_local.port must be <= 65535"
+            )
+        return self
+
+
 class TranslationChatboxLayoutConfig(_ConfigModel):
     """Store source-target stacked chatbox layout line budgets."""
 
@@ -592,6 +630,9 @@ class TranslationProvidersConfig(_ConfigModel):
 
     google_cloud: GoogleCloudTranslationProviderConfig = Field(
         default_factory=GoogleCloudTranslationProviderConfig
+    )
+    translategemma_local: TranslateGemmaLocalTranslationProviderConfig = Field(
+        default_factory=TranslateGemmaLocalTranslationProviderConfig
     )
 
 
@@ -685,6 +726,10 @@ class TranslationConfig(_ConfigModel):
             raise ValueError(
                 'translation.providers.google_cloud.project_id is required when translation.provider = "google_cloud"'
             )
+        if self.provider == "translategemma_local" and self.source_language is None:
+            raise ValueError(
+                'translation.source_language is required when translation.provider = "translategemma_local"'
+            )
         return self
 
 
@@ -752,6 +797,7 @@ __all__ = [
     "OscConfig",
     "PipelineConfig",
     "GoogleCloudTranslationProviderConfig",
+    "TranslateGemmaLocalTranslationProviderConfig",
     "SttConfig",
     "SttProvidersConfig",
     "SttRetryConfig",

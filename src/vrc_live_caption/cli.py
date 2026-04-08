@@ -14,6 +14,10 @@ from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
 from .env import AppSecrets, SecretError
 from .errors import OscError, VrcLiveCaptionError
 from .local_stt.funasr import FunasrLocalServiceConfig, run_funasr_local_server
+from .local_translation.translategemma import (
+    TranslateGemmaLocalServiceConfig,
+    run_translategemma_local_server,
+)
 from .logging_utils import configure_logging
 from .osc import OscChatboxTransport
 from .pipeline import LivePipelineController, record_audio_sample
@@ -28,13 +32,14 @@ from .stt import (
 from .translation import (
     create_translation_backend,
     describe_translation_backend,
+    probe_translategemma_local_service,
     validate_translation_runtime,
 )
 
 _INTERRUPT_EXCEPTIONS = (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
 
 app = typer.Typer(
-    help="VRC Live Caption CLI for audio diagnostics, live transcription, and local STT sidecars.",
+    help="VRC Live Caption CLI for audio diagnostics, live transcription, and local STT and translation sidecars.",
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -45,6 +50,12 @@ local_stt_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(local_stt_app, name="local-stt")
+local_translation_app = typer.Typer(
+    help="Manage repository-local translation sidecars.",
+    add_completion=False,
+    no_args_is_help=True,
+)
+app.add_typer(local_translation_app, name="local-translation")
 
 
 ConfigPathOption = Annotated[
@@ -113,6 +124,32 @@ LocalSttPortOption = Annotated[
         min=1,
         max=65_535,
         help="Port for the local STT sidecar websocket server.",
+        rich_help_panel="Network",
+    ),
+]
+LocalTranslationConfigPathOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--config",
+        help="Path to the local translation sidecar TOML config file.",
+        rich_help_panel="Configuration",
+    ),
+]
+LocalTranslationHostOption = Annotated[
+    str,
+    typer.Option(
+        "--host",
+        help="Host interface for the local translation sidecar websocket server.",
+        rich_help_panel="Network",
+    ),
+]
+LocalTranslationPortOption = Annotated[
+    int,
+    typer.Option(
+        "--port",
+        min=1,
+        max=65_535,
+        help="Port for the local translation sidecar websocket server.",
         rich_help_panel="Network",
     ),
 ]
@@ -249,6 +286,18 @@ def _load_optional_local_stt_config(
     exists = resolved.exists()
     return (
         FunasrLocalServiceConfig.from_toml_file(resolved, required=False),
+        resolved,
+        exists,
+    )
+
+
+def _load_optional_local_translation_config(
+    config_path: Path | None,
+) -> tuple[TranslateGemmaLocalServiceConfig, Path, bool]:
+    resolved = config_path or TranslateGemmaLocalServiceConfig.default_path()
+    exists = resolved.exists()
+    return (
+        TranslateGemmaLocalServiceConfig.from_toml_file(resolved, required=False),
         resolved,
         exists,
     )
@@ -508,25 +557,56 @@ def doctor(
             )
 
     if app_config.translation.enabled:
-        try:
-            validate_translation_runtime(
-                translation_config=app_config.translation,
-                secrets=AppSecrets(),
-                logger=root_logger.getChild("translation"),
-            )
-            typer.echo(
-                "[ok] translation configured: "
-                f"{describe_translation_backend(app_config.translation)} "
-                f"-> {app_config.translation.target_language} "
-                f"(mode={app_config.translation.output_mode}, "
-                f"strategy={app_config.translation.strategy})"
-            )
-        except (SecretError, VrcLiveCaptionError) as exc:
-            exit_code = 1
-            typer.echo(f"[error] {exc}")
-            typer.echo(
-                "        Hint: set DEEPL_AUTH_KEY for DeepL, or configure Google ADC plus translation.providers.google_cloud.project_id."
-            )
+        if app_config.translation.provider == "translategemma_local":
+            try:
+                probe_result = probe_translategemma_local_service(
+                    provider_config=app_config.translation.providers.translategemma_local,
+                    timeout_seconds=app_config.translation.request_timeout_seconds,
+                )
+                details: list[str] = []
+                if probe_result.model:
+                    details.append(f"model={probe_result.model}")
+                if probe_result.resolved_device:
+                    details.append(f"device={probe_result.resolved_device}")
+                if probe_result.device_policy:
+                    details.append(f"policy={probe_result.device_policy}")
+                if probe_result.resolved_dtype:
+                    details.append(f"dtype={probe_result.resolved_dtype}")
+                suffix = f": {', '.join(details)}" if details else ""
+                typer.echo(f"[ok] local translation sidecar reachable{suffix}")
+                typer.echo(
+                    "[ok] translation configured: "
+                    f"{describe_translation_backend(app_config.translation)} "
+                    f"-> {app_config.translation.target_language} "
+                    f"(mode={app_config.translation.output_mode}, "
+                    f"strategy={app_config.translation.strategy})"
+                )
+            except VrcLiveCaptionError as exc:
+                exit_code = 1
+                typer.echo(f"[error] {exc}")
+                typer.echo(
+                    "        Hint: start `vrc-live-caption local-translation serve` and confirm host/port match [translation.providers.translategemma_local]."
+                )
+        else:
+            try:
+                validate_translation_runtime(
+                    translation_config=app_config.translation,
+                    secrets=AppSecrets(),
+                    logger=root_logger.getChild("translation"),
+                )
+                typer.echo(
+                    "[ok] translation configured: "
+                    f"{describe_translation_backend(app_config.translation)} "
+                    f"-> {app_config.translation.target_language} "
+                    f"(mode={app_config.translation.output_mode}, "
+                    f"strategy={app_config.translation.strategy})"
+                )
+            except (SecretError, VrcLiveCaptionError) as exc:
+                exit_code = 1
+                typer.echo(f"[error] {exc}")
+                typer.echo(
+                    "        Hint: set DEEPL_AUTH_KEY for DeepL, or configure Google ADC plus translation.providers.google_cloud.project_id."
+                )
 
     raise typer.Exit(code=exit_code)
 
@@ -742,6 +822,70 @@ def local_stt_serve(
         _exit_with_error(str(exc))
     except Exception as exc:
         logger.exception("local-stt serve failed")
+        _exit_with_error(str(exc))
+
+
+@local_translation_app.command(
+    "serve", short_help="Run the local TranslateGemma translation sidecar."
+)
+def local_translation_serve(
+    config: LocalTranslationConfigPathOption = None,
+    host: LocalTranslationHostOption = "127.0.0.1",
+    port: LocalTranslationPortOption = 10096,
+    console_log_level: ConsoleLogLevelOption = None,
+    file_log_level: FileLogLevelOption = None,
+) -> None:
+    """Run the repository-local TranslateGemma websocket sidecar."""
+    try:
+        local_config, resolved_config_path, config_exists = (
+            _load_optional_local_translation_config(config)
+        )
+    except ConfigError as exc:
+        _exit_with_error(str(exc))
+
+    logging_config = _apply_logging_overrides(
+        LoggingConfig(file_path=local_config.log_path),
+        console_log_level=console_log_level,
+        file_log_level=file_log_level,
+    )
+    root_logger = configure_logging(logging_config)
+    logger = root_logger.getChild("cli")
+    logger.info(
+        "local-translation serve started: config=%s config_exists=%s host=%s port=%s",
+        resolved_config_path,
+        config_exists,
+        host,
+        port,
+    )
+
+    if config_exists:
+        typer.echo(f"Local translation config: {resolved_config_path}")
+    else:
+        typer.echo(
+            "[warn] local translation config missing: "
+            f"{resolved_config_path} (serve used built-in defaults)"
+        )
+    typer.echo(f"Local translation model: {local_config.model}")
+    typer.echo(f"Local translation device policy: {local_config.device}")
+    typer.echo(f"Local translation dtype policy: {local_config.dtype}")
+    typer.echo(f"Starting local TranslateGemma sidecar on ws://{host}:{port}")
+
+    try:
+        asyncio.run(
+            run_translategemma_local_server(
+                config=local_config,
+                host=host,
+                port=port,
+                logger=root_logger.getChild("local_translation.translategemma"),
+            )
+        )
+    except KeyboardInterrupt:
+        return
+    except VrcLiveCaptionError as exc:
+        logger.error("local-translation serve failed: %s", exc)
+        _exit_with_error(str(exc))
+    except Exception as exc:
+        logger.exception("local-translation serve failed")
         _exit_with_error(str(exc))
 
 

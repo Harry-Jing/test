@@ -1,0 +1,6 @@
+model = "google/translategemma-4b-it"
+# auto prefers cuda:0 with bfloat16 when available and falls back to cpu with float32.
+device = "auto"
+dtype = "auto"
+max_new_tokens = 256
+log_path = ".runtime/logs/local-translation-translategemma.log"

@@ -7,6 +7,9 @@ from vrc_live_caption.cli import app
 from vrc_live_caption.config import LoggingConfig, LogLevel
 from vrc_live_caption.errors import OscError, SecretError
 from vrc_live_caption.stt.funasr_local import FunasrLocalReadyEvent
+from vrc_live_caption.translation.translategemma_local import (
+    TranslateGemmaLocalReadyEvent,
+)
 
 
 def _iflytek_env() -> dict[str, str]:
@@ -298,6 +301,102 @@ class TestDoctorCommand:
 
         assert result.exit_code == 0
         assert "[ok] translation configured: deepl -> en" in result.output
+
+    def test_when_local_translategemma_translation_is_enabled__then_it_probes_sidecar(
+        self,
+        monkeypatch,
+        config_file_factory,
+        cli_runner,
+    ) -> None:
+        backend = FakeAudioBackend()
+        osc_transport = FakeOscTransport()
+        config_path = config_file_factory(
+            translation_overrides={
+                "enabled": True,
+                "provider": "translategemma_local",
+                "source_language": "zh",
+                "target_language": "en",
+                "output_mode": "source_target",
+            }
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.create_audio_backend", lambda: backend
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.create_osc_chatbox_transport",
+            lambda *, app_config, logger: osc_transport,
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.probe_translategemma_local_service",
+            lambda **kwargs: TranslateGemmaLocalReadyEvent(
+                message="ready",
+                model="google/translategemma-4b-it",
+                resolved_device="cuda:0",
+                device_policy="auto",
+                resolved_dtype="bfloat16",
+            ),
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.validate_translation_runtime",
+            lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("should not be called")
+            ),
+        )
+
+        result = cli_runner.invoke(
+            app,
+            ["doctor", "--config", str(config_path)],
+            env=_iflytek_env(),
+        )
+
+        assert result.exit_code == 0
+        assert (
+            "[ok] local translation sidecar reachable: "
+            "model=google/translategemma-4b-it, device=cuda:0, policy=auto, dtype=bfloat16"
+            in result.output
+        )
+        assert (
+            "[ok] translation configured: translategemma_local (127.0.0.1:10096)"
+            in result.output
+        )
+
+    def test_when_local_translategemma_probe_fails__then_it_prints_sidecar_hint(
+        self,
+        monkeypatch,
+        config_file_factory,
+        cli_runner,
+    ) -> None:
+        backend = FakeAudioBackend()
+        osc_transport = FakeOscTransport()
+        config_path = config_file_factory(
+            translation_overrides={
+                "enabled": True,
+                "provider": "translategemma_local",
+                "source_language": "zh",
+                "target_language": "en",
+            }
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.create_audio_backend", lambda: backend
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.create_osc_chatbox_transport",
+            lambda *, app_config, logger: osc_transport,
+        )
+        monkeypatch.setattr(
+            "vrc_live_caption.cli.probe_translategemma_local_service",
+            lambda **kwargs: (_ for _ in ()).throw(SecretError("sidecar unavailable")),
+        )
+
+        result = cli_runner.invoke(
+            app,
+            ["doctor", "--config", str(config_path)],
+            env=_iflytek_env(),
+        )
+
+        assert result.exit_code == 1
+        assert "sidecar unavailable" in result.output
+        assert "local-translation serve" in result.output
 
     def test_when_translation_secret_is_missing__then_it_exits_non_zero(
         self,

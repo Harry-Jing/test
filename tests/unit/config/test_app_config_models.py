@@ -2,6 +2,7 @@ from vrc_live_caption.config import (
     AppConfig,
     GoogleCloudTranslationProviderConfig,
     SttConfig,
+    TranslateGemmaLocalTranslationProviderConfig,
     TranslationChatboxLayoutConfig,
     TranslationConfig,
 )
@@ -50,3 +51,12 @@ class TestTranslationConfigModels:
         config = GoogleCloudTranslationProviderConfig(project_id="test-project")
 
         assert config.location == "global"
+
+    def test_when_local_translategemma_provider_config_is_created__then_port_defaults(
+        self,
+    ) -> None:
+        config = TranslateGemmaLocalTranslationProviderConfig()
+
+        assert config.host == "127.0.0.1"
+        assert config.port == 10096
+        assert config.use_ssl is False

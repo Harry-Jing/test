@@ -55,14 +55,33 @@ funasr-cu128 = [
     "torchaudio>=2.11.0",
 ]
 
+translategemma-cpu = [
+    "accelerate>=1.13.0",
+    "torch>=2.11.0",
+    "transformers>=5.5.0",
+]
+
+translategemma-cu128 = [
+    "accelerate>=1.13.0",
+    "torch>=2.11.0",
+    "transformers>=5.5.0",
+]
+
 [tool.uv]
 exclude-dependencies = ["editdistance"]
-conflicts = [[{ extra = "funasr-cpu" }, { extra = "funasr-cu128" }]]
+conflicts = [
+    [{ extra = "funasr-cpu" }, { extra = "funasr-cu128" }],
+    [{ extra = "translategemma-cpu" }, { extra = "translategemma-cu128" }],
+    [{ extra = "funasr-cpu" }, { extra = "translategemma-cu128" }],
+    [{ extra = "funasr-cu128" }, { extra = "translategemma-cpu" }],
+]
 
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cpu", extra = "funasr-cpu" },
     { index = "pytorch-cu128", extra = "funasr-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+    { index = "pytorch-cpu", extra = "translategemma-cpu" },
+    { index = "pytorch-cu128", extra = "translategemma-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
 torchaudio = [
     { index = "pytorch-cpu", extra = "funasr-cpu" },

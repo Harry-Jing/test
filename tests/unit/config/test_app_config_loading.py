@@ -31,6 +31,8 @@ class TestAppConfigLoading:
         assert config.translation.chatbox_layout.source_visible_lines == 4
         assert config.translation.chatbox_layout.separator_blank_lines == 1
         assert config.translation.chatbox_layout.target_visible_lines == 4
+        assert config.translation.providers.translategemma_local.host == "127.0.0.1"
+        assert config.translation.providers.translategemma_local.port == 10096
 
     def test_when_config_file_contains_custom_values__then_it_parses_them(
         self,
@@ -116,6 +118,11 @@ class TestAppConfigLoading:
                     "[translation.providers.google_cloud]",
                     'project_id = "test-project"',
                     'location = "global"',
+                    "",
+                    "[translation.providers.translategemma_local]",
+                    'host = "127.0.0.1"',
+                    "port = 11096",
+                    "use_ssl = true",
                 ]
             ),
             encoding="utf-8",
@@ -147,6 +154,8 @@ class TestAppConfigLoading:
         assert config.translation.target_language == "en"
         assert config.translation.chatbox_layout.source_visible_lines == 3
         assert config.translation.providers.google_cloud.project_id == "test-project"
+        assert config.translation.providers.translategemma_local.port == 11096
+        assert config.translation.providers.translategemma_local.use_ssl is True
 
 
 class TestParseDeviceValue:

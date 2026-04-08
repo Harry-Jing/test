@@ -6,6 +6,7 @@ from ..config import TranslationConfig
 from ..env import AppSecrets
 from ..errors import TranslationError
 from .backends import DeepLTranslationBackend, GoogleCloudTranslationBackend
+from .translategemma_local import TranslateGemmaLocalTranslationBackend
 from .types import TranslationBackend
 
 
@@ -36,6 +37,15 @@ def create_translation_backend(
         backend.validate_environment()
         return backend
 
+    if translation_config.provider == "translategemma_local":
+        backend = TranslateGemmaLocalTranslationBackend(
+            provider_config=translation_config.providers.translategemma_local,
+            timeout_seconds=translation_config.request_timeout_seconds,
+            logger=logger.getChild("translategemma_local"),
+        )
+        backend.validate_environment()
+        return backend
+
     raise TranslationError(
         f"Unsupported translation provider: {translation_config.provider}"
     )
@@ -48,6 +58,9 @@ def describe_translation_backend(translation_config: TranslationConfig) -> str:
         return (
             f"google_cloud ({provider_config.project_id}, {provider_config.location})"
         )
+    if translation_config.provider == "translategemma_local":
+        provider_config = translation_config.providers.translategemma_local
+        return f"translategemma_local ({provider_config.host}:{provider_config.port})"
     return translation_config.provider
 
 

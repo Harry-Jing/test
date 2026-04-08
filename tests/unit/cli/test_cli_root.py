@@ -14,7 +14,7 @@ class TestCliRootHelp:
         result = cli_runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "local STT sidecars" in result.output
+        assert "translation sidecars" in result.output
         assert "--version" in result.output
 
     def test_when_short_help_flag_is_used__then_it_matches_long_help(

@@ -25,6 +25,10 @@ Current contents:
   - sends short text requests to the real DeepL or Google Cloud Translation API
   - validates basic provider setup plus non-empty translated output
   - requires billable translation credentials and network access
+- `test_local_translation_sidecar.py`
+  - starts a lightweight fake websocket sidecar
+  - exercises the real local TranslateGemma websocket client backend
+  - validates ready probing plus translated result mapping without loading a real model
 
 For execution details, prerequisites, and the explicit command, use
 `docs/development/testing.md`.

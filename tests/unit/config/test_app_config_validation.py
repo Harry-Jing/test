@@ -104,6 +104,13 @@ class TestAppConfigTomlValidation:
 
 
 class TestTranslationConfigValidation:
+    def test_when_local_translategemma_provider_is_selected__then_config_accepts_it(
+        self,
+    ) -> None:
+        config = TranslationConfig(provider="translategemma_local")
+
+        assert config.provider == "translategemma_local"
+
     def test_when_translation_is_enabled_without_target_language__then_it_raises_value_error(
         self,
     ) -> None:
@@ -119,6 +126,19 @@ class TestTranslationConfigValidation:
         ):
             TranslationConfig(
                 enabled=True, provider="google_cloud", target_language="en"
+            )
+
+    def test_when_local_translategemma_is_enabled_without_source_language__then_it_raises_value_error(
+        self,
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match="translation.source_language is required",
+        ):
+            TranslationConfig(
+                enabled=True,
+                provider="translategemma_local",
+                target_language="en",
             )
 
     def test_when_output_mode_is_invalid__then_it_raises_value_error(self) -> None:
@@ -180,3 +200,18 @@ class TestProviderConfigValidation:
     def test_when_osc_port_is_out_of_range__then_it_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="osc.port must be <= 65535"):
             OscConfig(port=70_000)
+
+    def test_when_local_translategemma_port_is_out_of_range__then_it_raises_value_error(
+        self,
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match="translation.providers.translategemma_local.port must be <= 65535",
+        ):
+            AppConfig.model_validate(
+                {
+                    "translation": {
+                        "providers": {"translategemma_local": {"port": 70_000}}
+                    }
+                }
+            )
