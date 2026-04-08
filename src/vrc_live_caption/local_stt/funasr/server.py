@@ -55,7 +55,7 @@ class AutoModelFunasrBundle(FunasrModelBundle):
             from funasr import AutoModel
         except ImportError as exc:
             raise SttSessionError(
-                "FunASR dependencies are not installed. Install the local-cpu or local-cu128 extra."
+                "FunASR dependencies are not installed. Install the local-cpu or local-cu130 extra."
             ) from exc
 
         model_kwargs = {
@@ -173,7 +173,7 @@ def resolve_funasr_runtime_device(
         if not cuda_available:
             raise SttSessionError(
                 '[stt.providers.funasr_local.sidecar] requests device = "cuda", but torch.cuda.is_available() is false. '
-                "Install the local-cu128 extra and verify the Windows NVIDIA CUDA runtime."
+                "Install the local-cu130 extra and verify the Windows NVIDIA CUDA runtime."
             )
         return ResolvedFunasrDevice(
             device_policy=device_policy,

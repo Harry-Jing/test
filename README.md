@@ -36,7 +36,7 @@ Ordinary configuration lives in one file: `vrc-live-caption.toml`. See [docs/con
 
 For local inference dependencies, use one shared extra:
 - CPU: `uv sync --extra local-cpu`
-- CUDA 12.8: `uv sync --extra local-cu128`
+- CUDA 13.0: `uv sync --extra local-cu130`
 
 ## Common Commands
 

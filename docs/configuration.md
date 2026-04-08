@@ -26,11 +26,11 @@ When you want any local inference feature, install one shared local extra first:
 ```bash
 uv sync --extra local-cpu
 # or
-uv sync --extra local-cu128
+uv sync --extra local-cu130
 ```
 
 - Use `local-cpu` for CPU-only local STT and/or local translation.
-- Use `local-cu128` on Windows/NVIDIA machines when you want local inference to resolve `device = "auto"` to `cuda:0`.
+- Use `local-cu130` on Windows/NVIDIA machines when you want local inference to resolve `device = "auto"` to `cuda:0`.
 
 ## OpenAI Default
 
@@ -120,8 +120,8 @@ uv run vrc-live-caption run
 
 Common errors:
 
-- `FunASR dependencies are not installed`: install `local-cpu` or `local-cu128`.
-- `device = "cuda"` but CUDA is unavailable: either switch `[stt.providers.funasr_local.sidecar].device` to `cpu` or install `local-cu128` on a Windows/NVIDIA machine.
+- `FunASR dependencies are not installed`: install `local-cpu` or `local-cu130`.
+- `device = "cuda"` but CUDA is unavailable: either switch `[stt.providers.funasr_local.sidecar].device` to `cpu` or install `local-cu130` on a Windows/NVIDIA machine.
 - `local STT sidecar unreachable`: start `uv run vrc-live-caption local-stt serve` and make sure host and port match `[stt.providers.funasr_local]`.
 
 ## DeepL Translation
@@ -220,7 +220,7 @@ Environment prerequisites:
 Common errors:
 
 - `translation.source_language is required`: set `[translation].source_language`.
-- `TranslateGemma dependencies are not installed`: install `local-cpu` or `local-cu128`.
+- `TranslateGemma dependencies are not installed`: install `local-cpu` or `local-cu130`.
 - `local translation sidecar unreachable`: start `uv run vrc-live-caption local-translation serve` and make sure host and port match `[translation.providers.translategemma_local]`.
 - Model download or gated access failures: accept the license and authenticate with Hugging Face before starting the sidecar.
 

@@ -67,7 +67,7 @@ class TranslateGemmaModelBundle:
         except ImportError as exc:
             raise TranslationError(
                 "TranslateGemma dependencies are not installed. "
-                "Install the local-cpu or local-cu128 extra."
+                "Install the local-cpu or local-cu130 extra."
             ) from exc
 
         model_cls = getattr(transformers, "AutoModelForImageTextToText", None)
@@ -171,7 +171,7 @@ def resolve_translategemma_runtime(
         if not cuda_available:
             raise TranslationError(
                 '[translation.providers.translategemma_local.sidecar] requests device = "cuda", '
-                "but torch.cuda.is_available() is false. Install the local-cu128 extra "
+                "but torch.cuda.is_available() is false. Install the local-cu130 extra "
                 "and verify the Windows NVIDIA CUDA runtime."
             )
         resolved_device = "cuda:0"
@@ -204,7 +204,7 @@ def _resolve_torch_dtype(torch_module: Any | None, dtype_name: str) -> Any:
     if torch_module is None:
         raise TranslationError(
             "TranslateGemma dependencies are not installed. "
-            "Install the local-cpu or local-cu128 extra."
+            "Install the local-cpu or local-cu130 extra."
         )
     dtype = getattr(torch_module, dtype_name, None)
     if dtype is None:

@@ -21,11 +21,11 @@ For local inference, choose one shared extra before manual validation:
 
 ```bash
 uv sync --extra local-cpu
-uv sync --extra local-cu128
+uv sync --extra local-cu130
 ```
 
 - Use `local-cpu` for CPU-only local STT and local TranslateGemma validation.
-- Use `local-cu128` on Windows with an NVIDIA GPU when you want local inference to resolve `device = "auto"` to `cuda:0` and TranslateGemma `dtype = "auto"` to `bfloat16`.
+- Use `local-cu130` on Windows with an NVIDIA GPU when you want local inference to resolve `device = "auto"` to `cuda:0` and TranslateGemma `dtype = "auto"` to `bfloat16`.
 
 ## Secrets And Config
 

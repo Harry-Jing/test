@@ -29,7 +29,7 @@ class TestAutoModelFunasrBundleLoad:
 
         with pytest.raises(
             SttSessionError,
-            match="Install the local-cpu or local-cu128 extra",
+            match="Install the local-cpu or local-cu130 extra",
         ):
             AutoModelFunasrBundle.load(
                 config=FunasrLocalServiceConfig(),

@@ -74,7 +74,7 @@ class TestTranslateGemmaModelBundleLoad:
 
         with pytest.raises(
             TranslationError,
-            match="Install the local-cpu or local-cu128 extra",
+            match="Install the local-cpu or local-cu130 extra",
         ):
             TranslateGemmaModelBundle.load(
                 config=TranslateGemmaLocalServiceConfig(),
@@ -274,7 +274,7 @@ class TestResolveTranslateGemmaRuntime:
             },
         )
 
-        with pytest.raises(TranslationError, match="local-cu128 extra"):
+        with pytest.raises(TranslationError, match="local-cu130 extra"):
             resolve_translategemma_runtime(
                 device_policy="cuda",
                 dtype_policy="auto",
