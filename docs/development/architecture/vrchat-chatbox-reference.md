@@ -8,9 +8,9 @@ This document is the canonical implementation reference for the fixed VRChat cha
 - Long-text behavior is defined by a fixed text rectangle, fixed margins, fixed font size, the VRChat font/fallback stack, real glyph widths, TMP line-break tables, and a hard `9`-line cap.
 - For this project, the important target is text layout and clipping inside the `ChatText` rectangle, not full world-space chat bubble rendering.
 
-## Verified Layout Contract
+## Verified layout contract
 
-### Text Object Paths
+### Text object paths
 
 - Chat content:
   - `VRCPlayer > NameplateContainer > ChatBubble > Canvas > Chat > ChatText`
@@ -19,7 +19,7 @@ This document is the canonical implementation reference for the fixed VRChat cha
   - `VRCPlayer > NameplateContainer > ChatBubble > Canvas > TypingIndicator > Text`
   - `VRCPlayer > NameplateContainer > ChatBubbleMirror > Canvas > TypingIndicator > Text`
 
-### ChatText TMP Fields
+### ChatText TMP fields
 
 These values are high-confidence extracted values for both normal and mirrored `ChatText`.
 
@@ -61,21 +61,21 @@ These values apply to both normal and mirrored `ChatText`.
 | `anchoredPosition` | `(0, 0)` |
 | `pivot` | `(0.5, 0.5)` |
 
-### Chat Container And Canvas
+### Chat container and canvas
 
 - `Chat` stretches to the parent `Canvas`.
 - `Canvas` local scale is `(2, 2, 2)`.
 - parent `ChatBubble` local scale is `(0.5, 0.5, 0.5)`.
 - These scales should not be included in the wrap-width formula. Wrapping is driven by the local `ChatText` rectangle plus TMP settings.
 
-### Derived Layout Limits
+### Derived layout limits
 
 - fixed rect: `300 × 265`
 - margin: `(10, 10, 10, 10)`
 - usable size: `280 × 245`
 - max visible lines: `9`
 
-### TypingIndicator Parameters
+### TypingIndicator parameters
 
 TypingIndicator uses the same primary font asset but a different text configuration:
 
@@ -86,9 +86,9 @@ TypingIndicator uses the same primary font asset but a different text configurat
 - `lineSpacing = 0`
 - `enableAutoSizing = false`
 
-## Fonts And Fallbacks
+## Fonts and fallbacks
 
-### Primary Fonts
+### Primary fonts
 
 - primary TMP font asset: `NotoSans-Regular SDF`
 - primary raw font: `NotoSans-Regular`
@@ -112,7 +112,7 @@ TypingIndicator uses the same primary font asset but a different text configurat
 
 For Chinese, Japanese, and full-width punctuation, use `NotoSansCJK-JP-Regular` as the primary width model before considering later fallbacks.
 
-### Observed Fallback Chain
+### Observed fallback chain
 
 Observed local fallback order in `NotoSans-Regular SDF`:
 
@@ -141,11 +141,11 @@ Notes:
 - This fallback chain is a high-confidence inference from the raw `TMP_FontAsset` `PPtr` array, not a full typetree text export.
 - `sharedassets0.assets` also contains `NotoSansCJK-SC/TC/KR` assets, but the directly observed local CJK primary fallback for this chatbox remains `NotoSansCJK-JP-Regular SDF`.
 
-## Line-Break Rules
+## Line-break rules
 
 VRChat ships TMP line-break resources in `resources.assets`. These tables are more authoritative than handwritten punctuation rules.
 
-### Leading Characters
+### Leading characters
 
 ```text
 ([｛〔〈《「『【〘〖〝‘“｟«$—…‥〳〴〵\［（{£¥"々〇〉》」＄｠￥￦ #
@@ -155,7 +155,7 @@ Implementation meaning:
 
 - Prefer not to leave these characters at line end.
 
-### Following Characters
+### Following characters
 
 ```text
 )]｝〕〉》」』】〙〗〟’”｠»ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ々〻‐゠–〜?!‼⁇⁈⁉・、%,.:;。！？］）：；＝}¢°"†‡℃〆％，．
@@ -170,16 +170,16 @@ Implementation meaning:
 
 - Prefer not to start a line with these characters.
 
-## Derived Constraints And Validation
+## Derived constraints and validation
 
-### Usable Area
+### Usable area
 
 - width: `300 - 10 - 10 = 280`
 - height: `265 - 10 - 10 = 245`
 
 `280 × 245` is the real layout budget. Single-character capacity observations are validation anchors, not the primary model.
 
-### Why The Limit Is 9 Lines
+### Why the limit is 9 lines
 
 - Latin line height from `NotoSans-Regular` at `fontSize = 18` is about `24.516 px`
 - `245 / 24.516 ≈ 9.99`, which yields `9`
@@ -188,7 +188,7 @@ Implementation meaning:
 
 The `9`-line cap is explained directly by text height, font size, and font metrics.
 
-### Width Anchors
+### Width anchors
 
 - `x`: `advance = 529`, width at `18px` is about `9.522 px`, so `280 / 9.522 ≈ 29.40`, which yields `29`
 - `中`: `advance = 1000`, width at `18px` is `18 px`, so `280 / 18 ≈ 15.55`, which yields `15`
@@ -196,7 +196,7 @@ The `9`-line cap is explained directly by text height, font size, and font metri
 
 ASCII punctuation such as `.`, `,`, `:`, and `;` stays narrow under `NotoSans-Regular`. It should not be treated like CJK full-width punctuation.
 
-### Validation Anchors
+### Validation anchors
 
 Key observed anchors are explained by the fixed model:
 
@@ -219,7 +219,7 @@ Additional confirmed validation:
 - the later `a..z` and `A..H` sample set matched the model `34 / 34`
 - `中 × 144` showing only `135` visible characters is explained by `15 × 9 = 135`
 
-## Implementation Rules
+## Implementation rules
 
 - Use real glyph widths, not a fixed character-count heuristic.
 - Wrap against the usable width budget of `280 px`.
@@ -231,13 +231,13 @@ Additional confirmed validation:
 - For complex scripts that depend on shaping or reordering, use shaped glyph advances rather than per-codepoint widths.
 - Clip output to at most `9` visible lines after wrapping.
 
-## Known Unknowns
+## Known unknowns
 
 - The full custom MonoBehaviour typetree was not recovered, so some non-critical fields remain inferred rather than directly dumped.
 - The short-text chat bubble background resize logic is still not the authoritative model. The inspected object chain did not expose clearly named `ContentSizeFitter`, `LayoutElement`, `HorizontalLayoutGroup`, or `VerticalLayoutGroup` components, which suggests the width change is likely driven by custom script logic. This does not affect long-text wrapping and clipping inside `ChatText`.
 - Small non-critical field differences between normal and mirrored objects, including possible `overflowMode` differences, should not be used as primary implementation inputs unless re-verified.
 
-## Verification Appendix
+## Verification appendix
 
 Selected IDs for future spot-checking:
 

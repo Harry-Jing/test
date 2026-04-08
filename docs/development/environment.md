@@ -1,58 +1,68 @@
 # Environment
 
-Developer setup and environment defaults for `VRC Live Caption`.
+Setup and baseline expectations for local development.
+
+## Scope
+
+- This document covers local setup, runtime config versus secrets, dependency workflow, and local inference extras.
+- Use `vrc-live-caption.toml.example` as the user-facing config reference.
 
 ## Baseline
 
+- Windows is the primary validation platform.
 - Python: `3.14`
-- Use `uv` for environment setup and project commands
-- Run commands from the repository root
-- Windows is the primary validation platform
+- Use `uv` for setup and project commands.
+- Run commands from the repository root.
 
 ## Setup
 
-```bash
+```powershell
 uv sync
+uv run pre-commit install --install-hooks
 ```
 
-This creates or updates the project environment from `pyproject.toml` and `uv.lock`.
+When local secrets or runtime config are needed:
 
-For local inference, choose one shared extra before manual validation:
+```powershell
+Copy-Item .env.example .env
+Copy-Item vrc-live-caption.toml.example vrc-live-caption.toml
+```
 
-```bash
+## Config and secrets
+
+- `.env` is for secrets loaded through `pydantic-settings`.
+- Process environment variables override `.env`.
+- `vrc-live-caption.toml` is the ordinary runtime config file.
+- `vrc-live-caption.toml.example` is the user-facing config reference.
+- Common cloud credentials are:
+  - `OPENAI_API_KEY`
+  - `IFLYTEK_APP_ID`, `IFLYTEK_API_KEY`, `IFLYTEK_API_SECRET`
+  - `DEEPL_AUTH_KEY`
+  - Google ADC plus a configured Google Cloud project id
+- Local TranslateGemma validation may also require Hugging Face authentication and accepted Gemma license terms when the selected model is not already cached.
+
+## Local inference extras
+
+Choose one shared extra before local-model validation:
+
+```powershell
 uv sync --extra local-cpu
 uv sync --extra local-cu130
 ```
 
 - Use `local-cpu` for CPU-only local STT and local TranslateGemma validation.
-- Use `local-cu130` on Windows with an NVIDIA GPU when you want local inference to resolve `device = "auto"` to `cuda:0` and TranslateGemma `dtype = "auto"` to `bfloat16`.
+- Use `local-cu130` on Windows with an NVIDIA GPU when you want local inference to prefer CUDA.
 
-## Secrets And Config
-
-- Secrets are loaded through `pydantic-settings`.
-- Copy `.env.example` to `.env` when local secrets are needed.
-- Copy `vrc-live-caption.toml.example` to `vrc-live-caption.toml` for ordinary runtime config.
-- The default OpenAI backend requires `OPENAI_API_KEY`.
-- The optional iFLYTEK backend requires `IFLYTEK_APP_ID`, `IFLYTEK_API_KEY`, and `IFLYTEK_API_SECRET`.
-- The optional DeepL translation backend requires `DEEPL_AUTH_KEY`.
-- The optional Google Cloud Translation backend uses ADC plus `translation.providers.google_cloud.project_id`.
-- The optional local TranslateGemma translation backend does not require an app secret, but the sidecar may need Hugging Face authentication plus accepted Gemma license terms when the configured model is not already cached locally.
-- Process environment variables override `.env`.
-- Use `.env` for secrets only.
-- Ordinary runtime configuration comes from `vrc-live-caption.toml`.
-- Local FunASR and local TranslateGemma sidecar runtime settings are nested inside that same file under `[stt.providers.funasr_local.sidecar]` and `[translation.providers.translategemma_local.sidecar]`.
-- `vrc-live-caption.toml.example` is the user-facing setup reference.
-
-## Dependency Changes
+## Dependency workflow
 
 - Use `uv add <package>` for runtime dependencies.
 - Use `uv add --dev <package>` for development dependencies.
 - Commit both `pyproject.toml` and `uv.lock` after dependency changes.
 
-## Key Stack
+## Key stack
 
 - CLI: `Typer`
 - GUI: `PySide6`
 - Audio capture: `sounddevice`
 - OSC client: `python-osc`
-- Configuration: `TOML` + `pydantic v2`
+- Config: `TOML` + `pydantic v2`

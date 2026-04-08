@@ -1,37 +1,27 @@
 # Docstrings
 
-Use PEP 257 docstring structure.
-Use Google-style sections only when they add real information.
-Do not mix Google and NumPy styles.
+Project docstrings follow PEP 257. Write them in English. Ruff checks `pydocstyle` with the Google convention, so use Google-style sections only when they add real contract detail and do not mix Google and NumPy styles.
 
 ## Scope
 
-- Prioritize exported or user-facing modules, classes, functions, methods, properties, and public attributes.
-- Treat underscore-prefixed local helpers as private by default.
-- Skip docstrings for private helpers unless the behavior is non-obvious.
-- Test module docstrings are optional.
+- This document covers docstring expectations for exported or user-facing Python APIs.
+- Keep docstrings focused on contract, not implementation narration.
 
-## Core Rules
+## Write docstrings for
 
-- Write in English.
-- Keep the summary short and end it with a period.
-- Use one sentence when the symbol is easy to understand from its name and type.
+- exported or user-facing modules, classes, functions, methods, properties, and public attributes
+- private helpers only when the behavior is non-obvious
+
+## Style rules
+
+- Start with a short summary sentence and end it with a period.
 - In multi-line docstrings, leave one blank line after the summary.
-- Do not restate the function signature.
-- Do not repeat obvious type information from annotations.
-- Focus on behavior, constraints, side effects, and failure boundaries.
+- Describe behavior, constraints, side effects, and failure boundaries.
+- Use `Args`, `Returns`, `Yields`, `Raises`, and `Attributes` only when they add information the signature and types do not already make clear.
+- Do not restate the function signature or obvious annotated types.
 
-## Sections
+## Omit when
 
-Use `Args`, `Returns`, `Yields`, `Raises`, and `Attributes` only when they add meaningful contract detail.
-
-- Add sections when parameter or return semantics are not obvious.
-- Add sections when callers need to know about yielded values, exceptions, or public attributes.
-
-## Avoid
-
-- repeating parameter names without adding meaning
-- repeating annotated types
-- describing trivial implementation steps
-- writing long docstrings for simple pass-through code
-- adding extra detail to overrides that do not change behavior
+- the symbol is a trivial pass-through or override with unchanged behavior
+- the helper is private and the behavior is already clear from the code
+- the file is a test module; test module docstrings are optional

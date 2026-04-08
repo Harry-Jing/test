@@ -2,20 +2,20 @@
 
 Development documents for `VRC Live Caption`.
 
-## Core References
+## Core references
 
-- [Environment](./environment.md): setup, secrets, dependency rules, and key stack defaults
-- [Testing](./testing.md): default checks, coverage, live-test commands, and manual validation
+- [Environment](./environment.md): setup, secrets, dependency policy, and key stack defaults
+- [Testing](./testing.md): default checks, opt-in integration runs, coverage inspection, and manual validation
 - [Docstrings](./docstrings.md): concise docstring rules for public APIs
 
 ## Architecture
 
-- [Runtime](./architecture/runtime.md): current capture-to-pipeline contract, queue ownership, and CLI/runtime boundaries
-- [STT](./architecture/stt.md): backend selection, async runner lifecycle, retry behavior, and connection-attempt boundaries
-- [Caption And OSC](./architecture/caption-and-osc.md): caption stabilization, chatbox pacing, OSC output, and diagnostics behavior
-- [Translation](./architecture/translation.md): final-only text translation flow, provider boundaries, and stacked source-target chatbox rendering
-- [VRChat Chatbox Reference](./architecture/vrchat-chatbox-reference.md): concise canonical reference for the fixed VRChat chatbox wrap model
+- [Runtime](./architecture/runtime.md): capture, pipeline orchestration, CLI lifecycle, shutdown, and diagnostics
+- [STT](./architecture/stt.md): backend selection, retry lifecycle, provider boundaries, and normalized events
+- [Translation](./architecture/translation.md): final-only translation flow, providers, output modes, and bilingual layout rules
+- [Caption and OSC](./architecture/caption-and-osc.md): caption stabilization, pacing, typing state, and OSC output behavior
+- [VRChat Chatbox Reference](./architecture/vrchat-chatbox-reference.md): canonical wrap model, line-break rules, and fixed layout facts
 
 ## Plans
 
-- [UI](./plans/UI.md): minimal remaining GUI wrapper work
+- [UI](./plans/UI.md): minimal GUI guardrails
