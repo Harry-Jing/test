@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from . import __version__
 from .audio import AudioBackendError, AudioDeviceInfo, SoundDeviceBackend
 from .chatbox import ChatboxOutput
 from .config import AppConfig, ConfigError, LoggingConfig, LogLevel
@@ -163,11 +164,10 @@ def _show_version(value: bool) -> None:
     if not value:
         return
     try:
-        typer.echo(package_version("vrc-live-caption"))
+        resolved_version = package_version("vrc-live-caption")
     except PackageNotFoundError:
-        _exit_with_error(
-            "Package metadata not found; install the project before using --version."
-        )
+        resolved_version = __version__
+    typer.echo(resolved_version)
     raise typer.Exit()
 
 

@@ -1,9 +1,16 @@
 import importlib
+import re
 import runpy
 import sys
 from importlib.metadata import version as package_version
 
 from vrc_live_caption.cli import app
+
+_ANSI_ESCAPE_SEQUENCE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(value: str) -> str:
+    return _ANSI_ESCAPE_SEQUENCE.sub("", value)
 
 
 class TestCliRootHelp:
@@ -12,10 +19,11 @@ class TestCliRootHelp:
         cli_runner,
     ) -> None:
         result = cli_runner.invoke(app, ["--help"])
+        plain_output = _strip_ansi(result.output)
 
         assert result.exit_code == 0
-        assert "translation sidecars" in result.output
-        assert "--version" in result.output
+        assert "translation sidecars" in plain_output
+        assert "--version" in plain_output
 
     def test_when_short_help_flag_is_used__then_it_matches_long_help(
         self,
@@ -26,7 +34,7 @@ class TestCliRootHelp:
 
         assert long_help.exit_code == 0
         assert short_help.exit_code == 0
-        assert short_help.output == long_help.output
+        assert _strip_ansi(short_help.output) == _strip_ansi(long_help.output)
 
     def test_when_version_flag_is_used__then_it_prints_package_version(
         self,
