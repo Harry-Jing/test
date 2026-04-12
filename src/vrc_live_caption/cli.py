@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Annotated
 
@@ -37,7 +39,6 @@ from .translation import (
     probe_translategemma_local_service,
     validate_translation_runtime,
 )
-from .version import get_version
 
 _INTERRUPT_EXCEPTIONS = (asyncio.CancelledError, KeyboardInterrupt, SystemExit)
 
@@ -161,7 +162,12 @@ LocalTranslationPortOption = Annotated[
 def _show_version(value: bool) -> None:
     if not value:
         return
-    typer.echo(get_version())
+    try:
+        typer.echo(package_version("vrc-live-caption"))
+    except PackageNotFoundError:
+        _exit_with_error(
+            "Package metadata not found; install the project before using --version."
+        )
     raise typer.Exit()
 
 
