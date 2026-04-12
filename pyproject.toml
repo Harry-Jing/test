@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vrc-live-caption"
-version = "0.1.0"
+version = "0.2.0"
 description = "Real-time speech caption tool for VRChat via OSC."
 readme = "README.md"
 requires-python = ">=3.14"
