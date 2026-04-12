@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Harry-Jing/test/compare/vrc-live-caption-v0.1.0...vrc-live-caption-v0.2.0) (2026-04-12)
+
+
+### ✨ Features
+
+* ✨ sync with vrc-live-caption ([#6](https://github.com/Harry-Jing/test/issues/6)) ([a5abcd6](https://github.com/Harry-Jing/test/commit/a5abcd66cad0907a8ff6998c7ba5df35b93048b8))
+
 ## 0.1.0 (2026-04-12)
 
 
