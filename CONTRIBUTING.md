@@ -26,6 +26,8 @@ uv run ruff format --check
 uv run ty check
 ```
 
+If you created your environment with plain `uv sync`, rerun `uv sync --extra local-cpu` before `uv run ty check` so local typing matches the GitHub Actions quality job for the optional FunASR paths.
+
 ## Commit Messages
 
 Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) with the same type list as [`@commitlint/config-conventional`](https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional), and add a matching [gitmoji](https://gitmoji.dev/) after `: `.
@@ -52,6 +54,7 @@ Notes:
 
 - Use `!` for breaking changes, for example `feat(api)!: 💥 remove legacy auth`.
 - Keep the emoji aligned with the intent of the type. The list above is the repository's recommended type-to-gitmoji pairing.
+- Use gitmoji.dev's canonical forms in commit messages and PR titles, especially `📦️`, `⚡️`, `♻️`, and `⏪️`.
 
 Example commit messages:
 
@@ -73,5 +76,19 @@ Release automation notes:
 ## Pull Requests
 
 - Keep PRs small and focused.
+- Use the same Conventional Commit + gitmoji format for PR titles:
+
+  ```text
+  <type>[optional scope][!]: <emoji> <description>
+  ```
+
+  Examples:
+
+  - `feat(chatbox): ✨ add source-target layout mode`
+  - `fix(config): 🐛 handle missing .env file`
+  - `ci(release): 👷 add semantic PR title validation`
+
+- Repository automation validates PR titles with `amannn/action-semantic-pull-request`.
+- Release Please PRs are skipped automatically via their `autorelease:*` labels.
 - Explain why the change is needed.
 - Make sure checks pass.
